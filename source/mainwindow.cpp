@@ -23,7 +23,7 @@
 #include <QWidget>
 #include <QFile>
 #include <QTime>
-#include <QSound>
+#include <QSound> //和Qt5兼容，不需要再include Qtmultimedia
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -3413,14 +3413,19 @@ void MainWindow::runImpedanceMeasurement()
     progress.setModal(true);
     progress.setValue(0);
 
-    // Create a command list for the AuxCmd1 slot.
+    //以下应该独立成一个函数，便于freq扫描
+    //AuxCmd1 on START
+    // Create a command list for sine wave generation at the AuxCmd1 slot. The DAC max step is 128
     commandSequenceLength =
             chipRegisters.createCommandListZcheckDac(commandList, actualImpedanceFreq, 128.0);
     evalBoard->uploadCommandList(commandList, Rhd2000EvalBoard::AuxCmd1, 1);
     evalBoard->selectAuxCommandLength(Rhd2000EvalBoard::AuxCmd1,
                                       0, commandSequenceLength - 1);
-
+    // 这个应该根据 频率扫描循环改变
     progress.setValue(1);
+
+
+    //这个应该丢到循环外面，但是可能必须要有前面selectAuxCommandLength之后才能正常工作，如果是这样就不能丢到循环外。
 
     evalBoard->selectAuxCommandBank(Rhd2000EvalBoard::PortA,
                                     Rhd2000EvalBoard::AuxCmd1, 1);
@@ -3430,20 +3435,30 @@ void MainWindow::runImpedanceMeasurement()
                                     Rhd2000EvalBoard::AuxCmd1, 1);
     evalBoard->selectAuxCommandBank(Rhd2000EvalBoard::PortD,
                                     Rhd2000EvalBoard::AuxCmd1, 1);
+    //AuxCmd1 on END
 
     // Select number of periods to measure impedance over
+    // 时间和 numPeriods应该可用户选择，为了准确最短时间可以延长为0.1s甚至1s
     int numPeriods = qRound(0.020 * actualImpedanceFreq); // Test each channel for at least 20 msec...
     if (numPeriods < 5) numPeriods = 5; // ...but always measure across no fewer than 5 complete periods
+    // period表示一个周期要多少个data sample,比如 Fs= 20kHz, 测200Hz时候的impedance, 那么就要1/200秒，需要100个数据点
     double period = boardSampleRate / actualImpedanceFreq;
-    int numBlocks = qCeil((numPeriods + 2.0) * period / 60.0);  // + 2 periods to give time to settle initially
+    // 由于SAMPLES_PER_DATA_BLOCK==60, 这里应该用macro不应该直接用60.0
+    int numBlocks = qCeil((numPeriods + 2.0) * period / SAMPLES_PER_DATA_BLOCK);  // + 2 periods to give time to settle initially
     if (numBlocks < 2) numBlocks = 2;   // need first block for command to switch channels to take effect.
-
+    //set DSP START
+    //也许可以放到循环外部
     actualDspCutoffFreq = chipRegisters.setDspCutoffFreq(desiredDspCutoffFreq);
     actualLowerBandwidth = chipRegisters.setLowerBandwidth(desiredLowerBandwidth);
     actualUpperBandwidth = chipRegisters.setUpperBandwidth(desiredUpperBandwidth);
     chipRegisters.enableDsp(dspEnabled);
-    chipRegisters.enableZcheck(true);
+    //set DSP END
+
+    chipRegisters.enableZcheck(true); //也许可以放到循环外部
+
+    //创建FPGA命令，用于 register config
     commandSequenceLength = chipRegisters.createCommandListRegisterConfig(commandList, false);
+
     // Upload version with no ADC calibration to AuxCmd3 RAM Bank 1.
     evalBoard->uploadCommandList(commandList, Rhd2000EvalBoard::AuxCmd3, 3);
     evalBoard->selectAuxCommandLength(Rhd2000EvalBoard::AuxCmd3, 0, commandSequenceLength - 1);
@@ -3453,14 +3468,16 @@ void MainWindow::runImpedanceMeasurement()
     evalBoard->selectAuxCommandBank(Rhd2000EvalBoard::PortD, Rhd2000EvalBoard::AuxCmd3, 3);
 
     evalBoard->setContinuousRunMode(false);
-    evalBoard->setMaxTimeStep(SAMPLES_PER_DATA_BLOCK * numBlocks);
+    evalBoard->setMaxTimeStep(SAMPLES_PER_DATA_BLOCK * numBlocks); //设定定长运行模式，最长多少sample points
 
     // Create matrices of doubles of size (numStreams x 32 x 3) to store complex amplitudes
     // of all amplifier channels (32 on each data stream) at three different Cseries values.
+    // 这里不见得非要用QVector,可以用std vector
     QVector<QVector<QVector<double> > > measuredMagnitude;
     QVector<QVector<QVector<double> > > measuredPhase;
     measuredMagnitude.resize(evalBoard->getNumEnabledDataStreams());
     measuredPhase.resize(evalBoard->getNumEnabledDataStreams());
+    // 初始化vector of vector的大小
     for (int i = 0; i < evalBoard->getNumEnabledDataStreams(); ++i) {
         measuredMagnitude[i].resize(32);
         measuredPhase[i].resize(32);
@@ -3491,8 +3508,9 @@ void MainWindow::runImpedanceMeasurement()
 
         // Check all 32 channels across all active data streams.
         for (channel = 0; channel < 32; ++channel) {
-
+            //progress的值需要加入频率扫描，为了避免直接计算，应该用一个var来寄存，每次完成一部分就var+=1
             progress.setValue(32 * capRange + channel + 2);
+            //如果取消了，则进行task退出处理，应该独立搞一个function,便于使用
             if (progress.wasCanceled()) {
                 evalBoard->setContinuousRunMode(false);
                 evalBoard->setMaxTimeStep(0);
@@ -3506,21 +3524,37 @@ void MainWindow::runImpedanceMeasurement()
                 return;
             }
 
-            chipRegisters.setZcheckChannel(channel);
+            //在特定channel运行，应该可以独立成一个函数
+
+            chipRegisters.setZcheckChannel(channel); //选工作channel
+            //不明白这里再次upload auxCmd3的意义，难道是每次chipRegisters改变之后都必须upload?
             commandSequenceLength =
                     chipRegisters.createCommandListRegisterConfig(commandList, false);
             // Upload version with no ADC calibration to AuxCmd3 RAM Bank 1.
             evalBoard->uploadCommandList(commandList, Rhd2000EvalBoard::AuxCmd3, 3);
 
-            evalBoard->run();
+            evalBoard->run(); //运行
+
+            //凡是和qApp相关的部分放在主线程中，但上面硬件相关部分应该独立成一个thread,避免显示freeze DAQ
+
             while (evalBoard->isRunning() ) {
                 qApp->processEvents();
             }
+
+
             evalBoard->readDataBlocks(numBlocks, dataQueue);
+            //signalProcessor是个obj, 处理所有数据相关内容，还可以save data.应该把这些data全部save.
+            //只需要设置loadAmplifierData的参数就可以save.
+            //但之前需要初始化signalProcessor中的存档文件，startnewfile之类
+            //也可考虑重写存档方式，直接弄成memmap
             signalProcessor->loadAmplifierData(dataQueue, numBlocks, false, 0, 0, triggerIndex, bufferQueue,
                                                false, *saveStream, saveFormat, false, false, 0);
             for (stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
+                //这个所谓的stream表示A-D port上的Amp芯片序号。也就是说在遍历所有芯片的同一个channel。
+                //之所以这么设置，应该是前面的设置是同时设置了所有Amps.
                 if (chipId[stream] != CHIP_ID_RHD2164_B) {
+                    //这里已经在online处理数据，如果save所有data的话，完全可以去掉
+                    //由于不同input freq数据块大小可能不同，因此可以考虑生成一个辅助文件，保存每个freq下的数据块大小。由于时间也有用，所以应该同时保存每个freq开始的时间。此辅助文件可考虑用csv。
                     signalProcessor->measureComplexAmplitude(measuredMagnitude, measuredPhase,
                                                         capRange, stream, channel,  numBlocks, boardSampleRate,
                                                         actualImpedanceFreq, numPeriods);
@@ -3529,6 +3563,9 @@ void MainWindow::runImpedanceMeasurement()
 
             // If an RHD2164 chip is plugged in, we have to set the Zcheck select register to channels 32-63
             // and repeat the previous steps.
+            //完全重复代码，应该可以合并到上面的code中
+            //这个实际就是说，如果有RHD2164连入，那么一个port上就有两块Amps.因此一次扫2个channels
+            //但这实际没有必要应该可以在主循环直接扫64个channels.
             if (rhd2164ChipPresent) {
                 chipRegisters.setZcheckChannel(channel + 32); // address channels 32-63
                 commandSequenceLength =
@@ -3568,11 +3605,12 @@ void MainWindow::runImpedanceMeasurement()
     const double bestAmplitude = 250.0;  // we favor voltage readings that are closest to 250 uV: not too large,
                                          // and not too small.
     const double dacVoltageAmplitude = 128 * (1.225 / 256);  // this assumes the DAC amplitude was set to 128
-    const double parasiticCapacitance = 14.0e-12;  // 14 pF: an estimate of on-chip parasitic capacitance,
+    const double parasiticCapacitance = 14.0e-12;  // 14 pF: an estimate of on-chip parasitic capacitance, 这个值在将来应该手动设置。
                                                    // including 10 pF of amplifier input capacitance.
     double relativeFreq = actualImpedanceFreq / boardSampleRate;
 
     int bestAmplitudeIndex;
+    //对每个stream的当前channel算最好的数据点，基本意义就是通过不同电容注入，因此输入电流大小不同。
     for (stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
         for (channel = 0; channel < 32; ++channel) {
             signalChannel = signalSources->findAmplifierChannel(stream, channel);
@@ -3586,6 +3624,8 @@ void MainWindow::runImpedanceMeasurement()
                         minDistance = distance;
                     }
                 }
+
+                // 完全可以用array
                 switch (bestAmplitudeIndex) {
                 case 0:
                     Cseries = 0.1e-12;
@@ -3597,6 +3637,8 @@ void MainWindow::runImpedanceMeasurement()
                     Cseries = 10.0e-12;
                     break;
                 }
+
+                //后面是后期处理，完全可以offline或者另外一个lazy thread来处理。可考虑用lazy thread画Z-F-t, P-F-t图.由于这个更新很慢，完全可以call一个matplotlib来画。
 
                 // Calculate current amplitude produced by on-chip voltage DAC
                 current = TWO_PI * actualImpedanceFreq * dacVoltageAmplitude * Cseries;
@@ -3618,12 +3660,17 @@ void MainWindow::runImpedanceMeasurement()
                 empiricalResistanceCorrection(impedanceMagnitude, impedancePhase,
                                               boardSampleRate);
 
+                // 这里放在signalChannel中，可以直接GUI update显示Z在每个plot的底部。
+                // 所以只有一个单个值。
+                // 如果要freq循环则应该另外用一个vector保存
                 signalChannel->electrodeImpedanceMagnitude = impedanceMagnitude;
                 signalChannel->electrodeImpedancePhase = impedancePhase;
             }
         }
     }
+    //持续测impedance的话，应该在这里写csv文件block. t freq rawdatasize Zmod Zph
 
+    // 后面是退出处理
     evalBoard->setContinuousRunMode(false);
     evalBoard->setMaxTimeStep(0);
     evalBoard->flush();
@@ -3672,6 +3719,7 @@ void MainWindow::runImpedanceMeasurement()
 // with a parasitic capacitance (i.e., due to the amplifier input capacitance and other
 // capacitances associated with the chip bondpads), this function factors out the effect of the
 // parasitic capacitance to return the acutal electrode impedance.
+//此函数就是假设并联寄生电容，用固定的寄生电容14pF然后解出实际电抗，由于寄生电容不一样，所以此法有误差，应该让用户输入寄生电容值。
 void MainWindow::factorOutParallelCapacitance(double &impedanceMagnitude, double &impedancePhase,
                                               double frequency, double parasiticCapacitance)
 {
@@ -3696,6 +3744,9 @@ void MainWindow::factorOutParallelCapacitance(double &impedanceMagnitude, double
 // 2-pole lowpass filter.  This function attempts to somewhat correct for this, but a better
 // solution is to always run impedance measurements at 20 kS/s, where they seem to be most
 // accurate.
+//此函数会对所有freq进行修正，但是20kS/s以上修正就很小0.2%左右，因此原版中总是call这个函数，不论是否是<15kS/s. 考虑在我的版本中总是固定到20kS/s不变。
+
+
 void MainWindow::empiricalResistanceCorrection(double &impedanceMagnitude, double &impedancePhase,
                                                double boardSampleRate)
 {
@@ -3712,6 +3763,8 @@ void MainWindow::empiricalResistanceCorrection(double &impedanceMagnitude, doubl
 }
 
 // Save measured electrode impedances in CSV (Comma Separated Values) text file.
+// 应该同时保存所有波形，便于在后期进行offline处理
+// 应该提供频率扫描, 如果进行频率扫描 要么需要自动保存多个csv,或者在同一个csv中增加 freq field.
 void MainWindow::saveImpedances()
 {
     double equivalentR, equivalentC;

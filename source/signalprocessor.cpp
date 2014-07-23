@@ -1797,6 +1797,9 @@ void SignalProcessor::measureComplexAmplitude(QVector<QVector<QVector<double> > 
     int endIndex = startIndex + numPeriods * period - 1;
 
     // Move the measurement window to the end of the waveform to ignore start-up transient.
+    // 这实际很慢，应该直接 endIndex=floor(SAMPLES_PER_DATA_BLOCK * numBlocks /period)*period-1
+    // startIndex=endIndex-numPeriods*period+1
+    // endIndex之所以这么奇怪是因为后面作者用了<=endIndex, 完全可以用<endIndex,则不用-1和+1了
     while (endIndex < SAMPLES_PER_DATA_BLOCK * numBlocks - period) {
         startIndex += period;
         endIndex += period;

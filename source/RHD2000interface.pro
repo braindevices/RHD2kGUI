@@ -1,7 +1,7 @@
 TEMPLATE      = app
 
 QT            += widgets
-
+greaterThan(4, QT_MAJOR_VERSION): QT += multimedia
 CONFIG        += static
 
 HEADERS       = \

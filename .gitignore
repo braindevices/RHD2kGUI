@@ -26,3 +26,9 @@ Makefile*
 # QtCreator
 
 *.autosave
+
+#include the Opal Kelly libs
+!Opal\ Kelly\ library\ files/*
+!Opal\ Kelly\ library\ files/*/*
+#misc
+README.txt

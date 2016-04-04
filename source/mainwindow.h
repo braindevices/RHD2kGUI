@@ -132,6 +132,7 @@ private slots:
     void manualCableDelayControl();
     void plotPointsMode(bool enabled);
     void setSaveFormatDialog();
+    void setDacThreshold(int dacChannel, int threshold);
     void setDacThreshold1(int threshold);
     void setDacThreshold2(int threshold);
     void setDacThreshold3(int threshold);

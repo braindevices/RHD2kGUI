@@ -2980,12 +2980,13 @@ void MainWindow::loadSettings()
     }
 
     statusBar()->showMessage("Restoring settings from file...");
+    qDebug()<<"Restoring settings";
 
     inStream >> tempQint16;
     versionMain = tempQint16;
     inStream >> tempQint16;
     versionSecondary = tempQint16;
-
+    qDebug()<<"version: "<<versionMain<<"."<<versionSecondary;
     // Eventually check version number here for compatibility issues.
 
     inStream >> *signalSources;
@@ -2997,7 +2998,11 @@ void MainWindow::loadSettings()
     inStream >> tempQint16;
     tScaleComboBox->setCurrentIndex(tempQint16);
 
+    qDebug()<<"finishing the singalSources configuration";
+
     scanPorts();
+
+    qDebug()<<"finishing scan ports";
 
     inStream >> tempQint16;
     notchFilterComboBox->setCurrentIndex(tempQint16);
@@ -3016,20 +3021,28 @@ void MainWindow::loadSettings()
     // recordFileSpinBox->setValue(tempQint16);
     newSaveFilePeriodMinutes = tempQint16;
 
+    qDebug()<<"saveFile configuration done";
+
     inStream >> tempQint16;
     dspEnabled = (bool) tempQint16;
     inStream >> desiredDspCutoffFreq;
     inStream >> desiredLowerBandwidth;
     inStream >> desiredUpperBandwidth;
 
+    qDebug()<<"DSP and bandwidth configuration done";
+
     inStream >> desiredImpedanceFreq;
     inStream >> actualImpedanceFreq;
     inStream >> tempQint16;
     impedanceFreqValid = (bool) tempQint16;
 
+    qDebug()<<"impedance configuration done";
+
     // This will update bandwidth settings on RHD2000 chips and
     // the GUI bandwidth display:
     changeSampleRate(sampleRateComboBox->currentIndex());
+
+    qDebug()<<"sample rate configuration done";
 
     inStream >> tempQint16;
     dacGainSlider->setValue(tempQint16);
@@ -3041,6 +3054,7 @@ void MainWindow::loadSettings()
 
     QVector<QString> dacNamesTemp;
     dacNamesTemp.resize(8);
+
 
     for (int i = 0; i < 8; ++i) {
         inStream >> tempQint16;
@@ -3071,14 +3085,20 @@ void MainWindow::loadSettings()
     dacButton1->setChecked(true);
     dacEnableCheckBox->setChecked(dacEnabled[0]);
 
+    qDebug()<<"DAC configuration done";
+
     inStream >> tempQint16;
     fastSettleEnabled = (bool) tempQint16;
     fastSettleCheckBox->setChecked(fastSettleEnabled);
     enableFastSettle(fastSettleCheckBox->checkState());
 
+    qDebug()<<"fastSettle configuration done";
+
     inStream >> tempQint16;
     plotPointsCheckBox->setChecked((bool) tempQint16);
     plotPointsMode((bool) tempQint16);
+
+    qDebug()<<"plot configuration done";
 
     QString noteText;
     inStream >> noteText;
@@ -3087,6 +3107,8 @@ void MainWindow::loadSettings()
     note2LineEdit->setText(noteText);
     inStream >> noteText;
     note3LineEdit->setText(noteText);
+
+    qDebug()<<"Notes configuration done";
 
     // Ports are saved in reverse order.
     for (int port = 5; port >= 0; --port) {
@@ -3100,11 +3122,14 @@ void MainWindow::loadSettings()
         }
     }
 
+    qDebug()<<"ports configuration done";
+
     // Version 1.1 additions
     if ((versionMain == 1 && versionSecondary >= 1) || (versionMain > 1)) {
         inStream >> tempQint16;
         saveTemp = (bool) tempQint16;
     }
+    qDebug()<<"version 1.1 done";
 
     // Version 1.2 additions
     if ((versionMain == 1 && versionSecondary >= 2) || (versionMain > 1)) {
@@ -3121,12 +3146,17 @@ void MainWindow::loadSettings()
         inStream >> tempQint16;
         dacLockToSelectedBox->setChecked((bool) tempQint16);
     }
+    qDebug()<<"version 1.2 done";
 
     // Version 1.3 additions
     if ((versionMain == 1 && versionSecondary >= 3) || (versionMain > 1)) {
         inStream >> tempQint32;
+        qDebug()<<"tempQint32 = "<<tempQint32;
         dac1ThresholdSpinBox->setValue(tempQint32);
+        qDebug()<<"dac1ThresholdSpinBox";
         setDacThreshold1(tempQint32);
+        qDebug()<<"setDacThreshold1(tempQint32)";
+
         inStream >> tempQint32;
         dac2ThresholdSpinBox->setValue(tempQint32);
         setDacThreshold2(tempQint32);
@@ -3148,18 +3178,23 @@ void MainWindow::loadSettings()
         inStream >> tempQint32;
         dac8ThresholdSpinBox->setValue(tempQint32);
         setDacThreshold8(tempQint32);
+        qDebug()<<"dac threshold done";
 
         inStream >> tempQint16;
         saveTtlOut = (bool) tempQint16;
+        qDebug()<<"TtlOut done";
 
         inStream >> tempQint16;
         enableHighpassFilter((bool) tempQint16);
         highpassFilterCheckBox->setChecked(highpassFilterEnabled);
+        qDebug()<<"highpassFilterCheckBox done";
 
         inStream >> highpassFilterFrequency;
         highpassFilterLineEdit->setText(QString::number(highpassFilterFrequency, 'f', 2));
         setHighpassFilterCutoff(highpassFilterFrequency);
+        qDebug()<<"setHighpassFilterCutoff done";
     }
+    qDebug()<<"version 1.3 done";
 
     // Version 1.4 additions
     if ((versionMain == 1 && versionSecondary >= 4) || (versionMain > 1)) {
@@ -3223,6 +3258,7 @@ void MainWindow::loadSettings()
             }
         }
     }
+    qDebug()<<"version 1.4 done";
 
     settingsFile.close();
 
@@ -4060,52 +4096,70 @@ void MainWindow::setSaveFormatDialog()
     wavePlot->setFocus();
 }
 
+void MainWindow::setDacThreshold(int dacChannel, int threshold)
+{
+    if(!synthMode)
+    {
+        int threshLevel = qRound((double) threshold / 0.195) + 32768;
+        evalBoard->setDacThreshold(dacChannel, threshLevel, threshold >= 0);
+    }
+
+}
+
 void MainWindow::setDacThreshold1(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(0, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(0, threshLevel, threshold >= 0);
+    setDacThreshold(0, threshold);
 }
 
 void MainWindow::setDacThreshold2(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(1, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(1, threshLevel, threshold >= 0);
+    setDacThreshold(1, threshold);
 }
 
 void MainWindow::setDacThreshold3(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(2, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(2, threshLevel, threshold >= 0);
+    setDacThreshold(2, threshold);
 }
 
 void MainWindow::setDacThreshold4(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(3, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(3, threshLevel, threshold >= 0);
+    setDacThreshold(3, threshold);
 }
 
 void MainWindow::setDacThreshold5(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(4, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(4, threshLevel, threshold >= 0);
+    setDacThreshold(4, threshold);
 }
 
 void MainWindow::setDacThreshold6(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(5, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(5, threshLevel, threshold >= 0);
+    setDacThreshold(5, threshold);
 }
 
 void MainWindow::setDacThreshold7(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(6, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(6, threshLevel, threshold >= 0);
+    setDacThreshold(6, threshold);
 }
 
 void MainWindow::setDacThreshold8(int threshold)
 {
-    int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(7, threshLevel, threshold >= 0);
+//    int threshLevel = qRound((double) threshold / 0.195) + 32768;
+//    evalBoard->setDacThreshold(7, threshLevel, threshold >= 0);
+    setDacThreshold(7, threshold);
 }
 
 int MainWindow::getEvalBoardMode()

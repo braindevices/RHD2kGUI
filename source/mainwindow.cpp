@@ -59,6 +59,7 @@
 #include "rhd2000datablock.h"
 #include "okFrontPanelDLL.h"
 
+#include "impedancefreqListdialog.h"
 // Main Window of RHD2000 USB interface application.
 
 // Constructor.
@@ -72,6 +73,7 @@ MainWindow::MainWindow()
 
     // Default electrode impedance measurement frequency
     desiredImpedanceFreq = 1000.0;
+    desiredImpedanceFreqVec = {30, 100, 300, 1000}; //add by Ling Wang for EIS test
 
     actualImpedanceFreq = 0.0;
     impedanceFreqValid = false;
@@ -550,9 +552,9 @@ void MainWindow::createLayout()
     runImpedanceTestButton->setEnabled(false);
 
     connect(impedanceFreqSelectButton, SIGNAL(clicked()),
-            this, SLOT(changeImpedanceFrequency()));
+            this, SLOT(changeImpedanceFrequencyVec()));
     connect(runImpedanceTestButton, SIGNAL(clicked()),
-            this, SLOT(runImpedanceMeasurement()));
+            this, SLOT(runEISMeasurement()));
 
     showImpedanceCheckBox = new QCheckBox(tr("Show Last Measured Electrode Impedances"));
     connect(showImpedanceCheckBox, SIGNAL(clicked(bool)),
@@ -575,7 +577,7 @@ void MainWindow::createLayout()
     saveImpedancesLayout->addWidget(saveImpedancesButton);
     saveImpedancesLayout->addStretch(1);
 
-    desiredImpedanceFreqLabel = new QLabel(tr("Desired Impedance Test Frequency: 1000 Hz"));
+    desiredImpedanceFreqLabel = new QLabel(tr("Desired Impedance Test Frequency: -"));
     actualImpedanceFreqLabel = new QLabel(tr("Actual Impedance Test Frequency: -"));
 
     QVBoxLayout *impedanceLayout = new QVBoxLayout();
@@ -948,6 +950,9 @@ void MainWindow::createLayout()
     setCentralWidget(mainWidget);
 
     wavePlot->setFocus();
+
+    //add by Ling Wang
+    updateImpedanceFrequency();
 }
 
 // Create QActions linking menu items to functions.
@@ -1216,13 +1221,29 @@ void MainWindow::changeImpedanceFrequency()
     }
     wavePlot->setFocus();
 }
+void MainWindow::changeImpedanceFrequencyVec()
+{
+    qDebug()<<"start changeImpedanceFrequencyVec()";
+    ImpedanceFreqListDialog impedanceFListDialog(&desiredImpedanceFreqVec, actualLowerBandwidth, actualUpperBandwidth,
+                                                    actualDspCutoffFreq, dspEnabled, boardSampleRate, this);
+    if (impedanceFListDialog.exec()) {
+        updateImpedanceFrequency();
+
+    }
+    qDebug()<<"end changeImpedanceFrequencyVec()";
+
+}
 
 // Update electrode impedance measurement frequency, after checking that
 // requested test frequency lies within acceptable ranges based on the
 // amplifier bandwidth and the sampling rate.  See impedancefreqdialog.cpp
 // for more information.
+// modified to obtain frequency vector
+
 void MainWindow::updateImpedanceFrequency()
 {
+    qDebug()<<"start MainWindow::updateImpedanceFrequency()";
+
     int impedancePeriod;
     double lowerBandwidthLimit, upperBandwidthLimit;
 
@@ -1234,20 +1255,30 @@ void MainWindow::updateImpedanceFrequency()
         }
     }
 
-    if (desiredImpedanceFreq > 0.0) {
+    actualImpedanceFreqVec.clear();
+    if (!desiredImpedanceFreqVec.empty()) {
         desiredImpedanceFreqLabel->setText("Desired Impedance Test Frequency: " +
-                                           QString::number(desiredImpedanceFreq, 'f', 0) +
+                                           valueVecToText(&desiredImpedanceFreqVec, 0) +
                                            " Hz");
-        impedancePeriod = qRound(boardSampleRate / desiredImpedanceFreq);
-        if (impedancePeriod >= 4 && impedancePeriod <= 1024 &&
-                desiredImpedanceFreq >= lowerBandwidthLimit &&
-                desiredImpedanceFreq <= upperBandwidthLimit) {
-            actualImpedanceFreq = boardSampleRate / impedancePeriod;
-            impedanceFreqValid = true;
-        } else {
-            actualImpedanceFreq = 0.0;
-            impedanceFreqValid = false;
+        foreach(auto _deF, desiredImpedanceFreqVec)
+        {
+            qDebug()<< "_deF = " << _deF;
+            impedancePeriod = qRound(boardSampleRate / _deF);
+            if (impedancePeriod >= 4 && impedancePeriod <= 1024 &&
+                    _deF >= lowerBandwidthLimit &&
+                    _deF <= upperBandwidthLimit) {
+                actualImpedanceFreqVec.append(boardSampleRate / impedancePeriod);
+                impedanceFreqValid = true;
+
+            } else {
+                actualImpedanceFreq = 0.0;
+                impedanceFreqValid = false;
+                qDebug()<< "_deF is wrong!";
+                break;
+            }
         }
+        actualImpedanceFreq = 0;
+
     } else {
         desiredImpedanceFreqLabel->setText("Desired Impedance Test Frequency: -");
         actualImpedanceFreq = 0.0;
@@ -1255,12 +1286,13 @@ void MainWindow::updateImpedanceFrequency()
     }
     if (impedanceFreqValid) {
         actualImpedanceFreqLabel->setText("Actual Impedance Test Frequency: " +
-                                          QString::number(actualImpedanceFreq, 'f', 1) +
+                                          valueVecToText(&actualImpedanceFreqVec, 1) +
                                           " Hz");
     } else {
         actualImpedanceFreqLabel->setText("Actual Impedance Test Frequency: -");
     }
     runImpedanceTestButton->setEnabled(impedanceFreqValid);
+    qDebug()<<"end MainWindow::updateImpedanceFrequency()";
 }
 
 // Rename selected channel.
@@ -3257,6 +3289,9 @@ void MainWindow::loadSettings()
                 evalBoard->setCableDelay(Rhd2000EvalBoard::PortD, manualDelay[3]);
             }
         }
+        inStream >> desiredImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
+        inStream >> actualImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
+
     }
     qDebug()<<"version 1.4 done";
 
@@ -3386,6 +3421,9 @@ void MainWindow::saveSettings()
     outStream << (qint16) manualDelay[2];
     outStream << (qint16) manualDelay[3];
 
+    outStream << desiredImpedanceFreqVec;
+    outStream << actualImpedanceFreqVec;
+
     settingsFile.close();
 
     statusBar()->clearMessage();
@@ -3474,7 +3512,7 @@ void MainWindow::runImpedanceMeasurement()
     //AuxCmd1 on END
 
     // Select number of periods to measure impedance over
-    // 时间和 numPeriods应该可用户选择，为了准确最短时间可以延长为0.1s甚至1s
+    // 时间和 numPeriods应该可用户选择，为了准确最短时间可以延长为0.1s甚至1s; 但实际上如果用原始的计算方法，不论多长时间，都只会使用最后一个周期的数据进行计算。应该才用获得波形平均值的办法。
     int numPeriods = qRound(0.020 * actualImpedanceFreq); // Test each channel for at least 20 msec...
     if (numPeriods < 5) numPeriods = 5; // ...but always measure across no fewer than 5 complete periods
     // period表示一个周期要多少个data sample,比如 Fs= 20kHz, 测200Hz时候的impedance, 那么就要1/200秒，需要100个数据点
@@ -3798,18 +3836,107 @@ void MainWindow::empiricalResistanceCorrection(double &impedanceMagnitude, doubl
     impedancePhase = RADIANS_TO_DEGREES * qAtan2(impedanceX, impedanceR);
 }
 
+
+void MainWindow::clearEISdataInSingalsources()
+{
+    qDebug()<<"clearEISdataInSingalsources()";
+    SignalChannel *signalChannel;
+    qDebug()<<"evalBoard->getNumEnabledDataStreams() = "<<evalBoard->getNumEnabledDataStreams();
+    for (int stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
+        for (int channel = 0; channel < 32; ++channel) {
+            signalChannel = signalSources->findAmplifierChannel(stream, channel);
+            qDebug()<<"channelname: "<<signalChannel->nativeChannelName;
+            signalChannel->EISFreqVec.clear();
+            signalChannel->EIS_MagnitudeVec.clear();
+            signalChannel->EIS_PhaseVec.clear();
+        }
+    }
+    qDebug()<<"end clearEISdataInSingalsources()";
+}
+
+void MainWindow::appendEISdataInSingalsources(double freq)
+{
+    qDebug()<<"appendEISdataInSingalsources";
+    SignalChannel *signalChannel;
+    qDebug()<<"evalBoard->getNumEnabledDataStreams() = "<<evalBoard->getNumEnabledDataStreams();
+    for (int stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
+        for (int channel = 0; channel < 32; ++channel) {
+            signalChannel = signalSources->findAmplifierChannel(stream, channel);
+            qDebug()<<"chan Name: "<<signalChannel->nativeChannelName;
+            signalChannel->EISFreqVec.append(freq);
+            signalChannel->EIS_MagnitudeVec.append(signalChannel->electrodeImpedanceMagnitude);
+            signalChannel->EIS_PhaseVec.append(signalChannel->electrodeImpedancePhase);
+        }
+    }
+    qDebug()<<"end appendEISdataInSingalsources";
+}
+
+//Run MainWindow::runImpedanceMeasurement() multiple times according to the actualImpedanceFreqVec
+void MainWindow::runEISMeasurement()
+{
+    qDebug()<<"runEISMeasurement()";
+    // We can't really measure impedances in demo mode, so just return.
+    if (synthMode) {
+        qDebug()<<"We can't really measure impedances in demo mode, so just return.";
+        showImpedanceCheckBox->setChecked(true);
+        showImpedances(true);
+        wavePlot->setFocus();
+        return;
+    }
+
+    clearEISdataInSingalsources();
+
+    foreach(auto _freq, actualImpedanceFreqVec)
+    {
+        actualImpedanceFreq = _freq;
+        runImpedanceMeasurement();
+        appendEISdataInSingalsources(_freq);
+
+
+    }
+    qDebug()<<"end runEISMeasurement()";
+}
+
+
 // Save measured electrode impedances in CSV (Comma Separated Values) text file.
 // 应该同时保存所有波形，便于在后期进行offline处理
 // 应该提供频率扫描, 如果进行频率扫描 要么需要自动保存多个csv,或者在同一个csv中增加 freq field.
-void MainWindow::saveImpedances()
+void MainWindow::write1FreqEISfor1Chan(SignalChannel *signalChannel, QTextStream& out, int idx)
 {
-    double equivalentR, equivalentC;
+    auto _electrodeImpedanceMagnitude = signalChannel->EIS_MagnitudeVec[idx];
+    auto _electrodeImpedancePhase = signalChannel->EIS_PhaseVec[idx];
 
-    QString csvFileName;
-    csvFileName = QFileDialog::getSaveFileName(this,
-                                            tr("Save Impedance Data As"), ".",
-                                            tr("CSV (Comma delimited) (*.csv)"));
+    auto equivalentR = _electrodeImpedanceMagnitude *
+            qCos(DEGREES_TO_RADIANS * _electrodeImpedancePhase);
+    auto equivalentC = 1.0 / (TWO_PI * actualImpedanceFreq * _electrodeImpedanceMagnitude *
+                         -1.0 * qSin(DEGREES_TO_RADIANS * _electrodeImpedancePhase));
 
+    out.setRealNumberNotation(QTextStream::ScientificNotation);
+    out.setRealNumberPrecision(6);
+
+    out << signalChannel->nativeChannelName << ",";
+    out << signalChannel->customChannelName << ",";
+    out << signalChannel->signalGroup->name << ",";
+    out << signalChannel->enabled << ",";
+
+    out <<signalChannel->EISFreqVec[idx],
+
+    out << _electrodeImpedanceMagnitude << ",";
+
+    out.setRealNumberNotation(QTextStream::FixedNotation);
+    out.setRealNumberPrecision(1);
+
+    out << _electrodeImpedancePhase << ",";
+
+    out.setRealNumberNotation(QTextStream::ScientificNotation);
+    out.setRealNumberPrecision(6);
+
+    out << equivalentR << ",";
+    out << equivalentC << endl;
+}
+
+void MainWindow::saveImpedancesCSV(QString csvFileName)
+{
     if (!csvFileName.isEmpty()) {
         QFile csvFile(csvFileName);
 
@@ -3829,37 +3956,29 @@ void MainWindow::saveImpedances()
         for (int stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
             for (int channel = 0; channel < 32; ++channel) {
                 signalChannel = signalSources->findAmplifierChannel(stream, channel);
-                equivalentR = signalChannel->electrodeImpedanceMagnitude *
-                        qCos(DEGREES_TO_RADIANS * signalChannel->electrodeImpedancePhase);
-                equivalentC = 1.0 / (TWO_PI * actualImpedanceFreq * signalChannel->electrodeImpedanceMagnitude *
-                                     -1.0 * qSin(DEGREES_TO_RADIANS * signalChannel->electrodeImpedancePhase));
+                int _len = signalChannel->EISFreqVec.size();
+                for (int _idx = 0; _idx < _len; ++_idx) {
+                    write1FreqEISfor1Chan(signalChannel, out, _idx);
+                }
 
-                out.setRealNumberNotation(QTextStream::ScientificNotation);
-                out.setRealNumberPrecision(2);
-
-                out << signalChannel->nativeChannelName << ",";
-                out << signalChannel->customChannelName << ",";
-                out << signalChannel->signalGroup->name << ",";
-                out << signalChannel->enabled << ",";
-                out << signalChannel->electrodeImpedanceMagnitude << ",";
-
-                out.setRealNumberNotation(QTextStream::FixedNotation);
-                out.setRealNumberPrecision(0);
-
-                out << signalChannel->electrodeImpedancePhase << ",";
-
-                out.setRealNumberNotation(QTextStream::ScientificNotation);
-                out.setRealNumberPrecision(2);
-
-                out << equivalentR << ",";
-                out << equivalentC << endl;
             }
         }
 
         csvFile.close();
     }
+}
+
+void MainWindow::saveImpedances()
+{
+    QString csvFileName;
+    csvFileName = QFileDialog::getSaveFileName(this,
+                                            tr("Save Impedance Data As"), ".",
+                                            tr("CSV (Comma delimited) (*.csv)"));
+
+    saveImpedancesCSV(csvFileName);
     wavePlot->setFocus();
 }
+
 
 void MainWindow::plotPointsMode(bool enabled)
 {

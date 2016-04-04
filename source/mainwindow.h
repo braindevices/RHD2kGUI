@@ -76,6 +76,8 @@ public:
     int getEvalBoardMode();
     bool isRecording();
 
+
+
 protected:
     void closeEvent(QCloseEvent *event);
 
@@ -127,6 +129,7 @@ private slots:
     void saveSettings();
     void showImpedances(bool enabled);
     void saveImpedances();
+    void runEISMeasurement();
     void runImpedanceMeasurement();
     void configDigOutControl();
     void manualCableDelayControl();
@@ -141,6 +144,10 @@ private slots:
     void setDacThreshold6(int threshold);
     void setDacThreshold7(int threshold);
     void setDacThreshold8(int threshold);
+
+    //add by Ling Wang for EIS test
+    void changeImpedanceFrequencyVec();
+    //end add by Ling Wang for EIS test
 
 private:
     void createActions();
@@ -362,6 +369,15 @@ private:
     QLabel *actualImpedanceFreqLabel;
     QLabel *dacGainLabel;
     QLabel *dacNoiseSuppressLabel;
+
+    //add by Ling Wang for EIS test
+    QVector<double> desiredImpedanceFreqVec;
+    QVector<double> actualImpedanceFreqVec;
+    void clearEISdataInSingalsources();
+    void appendEISdataInSingalsources(double freq);
+    void saveImpedancesCSV(QString csvFileName);
+    void write1FreqEISfor1Chan(SignalChannel *signalChannel, QTextStream& out, int idx);
+    //end add by Ling Wang for EIS test
 };
 
 #endif // MAINWINDOW_H

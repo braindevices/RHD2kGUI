@@ -23,6 +23,7 @@
 #define SIGNALCHANNEL_H
 
 #include "qtincludes.h"
+#include <QVector>
 
 class SignalGroup;
 class QDataStream;
@@ -73,6 +74,12 @@ public:
 
     double electrodeImpedanceMagnitude;
     double electrodeImpedancePhase;
+
+    //for EIS Vec
+    QVector<double> EISFreqVec = {10,30,40.};
+    QVector<double> EIS_MagnitudeVec = {100,300,400.};
+    QVector<double> EIS_PhaseVec =  {1,3,4.};
+
 
     QString saveFileName;
     QFile *saveFile;

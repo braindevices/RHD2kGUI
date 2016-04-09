@@ -52,6 +52,9 @@
 #define SETTINGS_FILE_LWE_MAGIC_NUMBER  0x45ab12de //setting file for LW enhanced edition
 #define SETTINGS_FILE_LWE_MAIN_VERSION_NUMBER  0
 #define SETTINGS_FILE_LWE_SECONDARY_VERSION_NUMBER  1
+#define SETTING_FILE_SUFFIX  "isf"
+#define SETTING_FOLDER_DEFAULT  ".rhd2kLWE"
+#define SETTING_FILE_DEFAULT  "default.isf"
 
 // RHD2000 chip ID numbers from ROM register 63
 #define CHIP_ID_RHD2132  1

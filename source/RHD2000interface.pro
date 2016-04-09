@@ -2,6 +2,8 @@ QMAKE_CXXFLAGS += -std=c++11
 TEMPLATE      = app
 QT            += widgets
 greaterThan(QT_MAJOR_VERSION, 4): QT += multimedia
+#for qt5 need to install qt5 multimedia library
+#install qtmultimedia5-dev libqt5multimediawidgets5 libqt5multimedia5-plugins libqt5multimedia5
 #QT += multimedia
 CONFIG        += static
 
@@ -35,8 +37,7 @@ HEADERS       = \
     auxdigoutconfigdialog.h \
     cabledelaydialog.h \
     helpdialogfastsettle.h \
-    impedancefreqListdialog.h \
-    changefontsdialog.h
+    impedancefreqListdialog.h
 
 SOURCES       = main.cpp \
     okFrontPanelDLL.cpp \
@@ -66,8 +67,7 @@ SOURCES       = main.cpp \
     auxdigoutconfigdialog.cpp \
     cabledelaydialog.cpp \
     helpdialogfastsettle.cpp \
-    impedancefreqListdialog.cpp \
-    changefontsdialog.cpp
+    impedancefreqListdialog.cpp
     
 RESOURCES     = RHD2000interface.qrc
 LIBS+=-lm
@@ -95,5 +95,3 @@ QMAKE_CFLAGS_RELEASE -= -O2
 QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE += -O3
-
-FORMS +=

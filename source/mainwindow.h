@@ -393,11 +393,29 @@ private:
 
     QAction *saveLWESettingsAction;
 
+
+
+    //end add by Ling Wang for EIS test
+
+    //add by Ling Wang to improve GUI
+    QWidget *leftside;
+
     QMenu *fontsMenu;
     QAction *changeLFontsAction;
     QAction *changeRFontsAction;
+    QFont changeFonts(QWidget*);
+    QFont leftFont;
+    QFont rightFont;
+    void updateFonts(); //update widgets fonts with leftFont and rightFont
 
-    //end add by Ling Wang for EIS test
+    QString lastSettingFilePath = ".";
+
+    void loadDefaultSetting();
+    void _loadSettings(QString loadSettingsFileName);
+
+    //end add by Ling Wang to improve GUI
+
+
 };
 
 #endif // MAINWINDOW_H

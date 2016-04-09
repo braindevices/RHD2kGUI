@@ -206,6 +206,8 @@ MainWindow::MainWindow()
         }
         fileTemp.close();
     }
+
+    loadDefaultSetting();
 }
 
 // Scan SPI Ports A-D to identify all connected RHD2000 amplifier chips.
@@ -957,7 +959,7 @@ void MainWindow::createLayout()
 //    QHBoxLayout *mainLayout = new QHBoxLayout;
 //    mainLayout->addLayout(leftLayout);
 //    mainLayout->addWidget(wavePlot);
-    QWidget *leftside = new QWidget;
+    leftside = new QWidget;
     leftside->setLayout(leftLayout);
 
 
@@ -976,6 +978,9 @@ void MainWindow::createLayout()
     wavePlot->setFocus();
 
     //add by Ling Wang
+    leftFont = leftside->font();
+    rightFont = wavePlot->font();
+
     updateImpedanceFrequency();
 }
 
@@ -1050,6 +1055,11 @@ void MainWindow::createActions()
             new QAction(tr("Disable all Channels on Port"), this);
     connect(disableAllChannelsAction, SIGNAL(triggered()),
             this, SLOT(disableAllChannels()));
+
+    changeLFontsAction = new QAction(tr("Change Left side Fonts"), this);
+    connect(changeLFontsAction, SIGNAL(triggered()), this, SLOT(changeLFonts()));
+    changeRFontsAction = new QAction(tr("Change Right side Fonts"), this);
+    connect(changeRFontsAction, SIGNAL(triggered()), this, SLOT(changeRFonts()));
 }
 
 // Create pull-down menus.
@@ -1070,6 +1080,10 @@ void MainWindow::createMenus()
     channelMenu->addSeparator();
     channelMenu->addAction(originalOrderAction);
     channelMenu->addAction(alphaOrderAction);
+
+    fontsMenu = menuBar()->addMenu(tr("&Fonts"));
+    fontsMenu->addAction(changeLFontsAction);
+    fontsMenu->addAction(changeRFontsAction);
 
     menuBar()->addSeparator();
 
@@ -3018,22 +3032,31 @@ void MainWindow::setExternalFastSettleChannel(int channel)
     wavePlot->setFocus();
 }
 
-// Load application settings from *.isf (Intan Settings File) file.
-void MainWindow::loadSettings()
-{
+void MainWindow::loadSettings() {
     QString loadSettingsFileName;
     loadSettingsFileName = QFileDialog::getOpenFileName(this,
-                                                        tr("Select Settings Filename"), ".",
-                                                        tr("Intan Settings Files (*.isf)"));
+                                                        tr("Select Settings Filename"), QDir::currentPath(),
+                                                        tr("Intan Settings Files (*.isf);;"
+                                                           "All files (*.*)"));
     if (loadSettingsFileName.isEmpty()) {
         wavePlot->setFocus();
         return;
     }
+    _loadSettings(loadSettingsFileName);
+    lastSettingFilePath = QDir(loadSettingsFileName).dirName();
+}
+
+// Load application settings from *.isf (Intan Settings File) file.
+void MainWindow::_loadSettings(QString loadSettingsFileName)
+{
+
 
     QFile settingsFile(loadSettingsFileName);
     if (!settingsFile.open(QIODevice::ReadOnly)) {
         cerr << "Can't open settings file " <<
                 loadSettingsFileName.toStdString() << endl;
+        QMessageBox::warning(this, "I/O Error",
+                             QString("Cannot open default setting file:\n%1").arg(loadSettingsFileName));
         wavePlot->setFocus();
         return;
     }
@@ -3363,6 +3386,13 @@ void MainWindow::loadSettings()
 
     qDebug() <<"LWE version 0.1";
     if((versionLWEMain == 0 && versionSecondary >= 1) || (versionMain > 0)) {
+        QFont _font;
+        inStream >> _font;
+        leftFont = _font;
+        inStream >> _font;
+        rightFont = _font;
+        updateFonts();
+
         inStream >> desiredImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
         inStream >> actualImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
         inStream >> tempQint16;
@@ -3518,9 +3548,11 @@ void MainWindow::saveSettings()
 void MainWindow::saveLWESettings()
 {
     QString saveSettingsFileName;
+    QString _filter = tr("Intan Settings Files (*.%1)");
+    _filter = _filter.arg(SETTING_FILE_SUFFIX);
     saveSettingsFileName = QFileDialog::getSaveFileName(this,
-                                            tr("Select Settings Filename"), ".",
-                                            tr("Intan Settings Files (*.isf)"));
+                                            tr("Select Settings Filename"), lastSettingFilePath,
+                                            _filter, &_filter);
 
     if (saveSettingsFileName.isEmpty()) {
         wavePlot->setFocus();
@@ -3640,6 +3672,8 @@ void MainWindow::saveLWESettings()
     outStream << (qint16) SETTINGS_FILE_LWE_MAIN_VERSION_NUMBER;
     outStream << (qint16) SETTINGS_FILE_LWE_SECONDARY_VERSION_NUMBER;
 
+    outStream << leftFont;
+    outStream << rightFont;
 
     outStream << desiredImpedanceFreqVec;
     outStream << actualImpedanceFreqVec;
@@ -3650,6 +3684,43 @@ void MainWindow::saveLWESettings()
 
     statusBar()->clearMessage();
     wavePlot->setFocus();
+}
+
+void MainWindow::changeLFonts()
+{
+    leftFont = changeFonts(leftside);
+}
+
+void MainWindow::changeRFonts()
+{
+    rightFont = changeFonts(wavePlot);
+    wavePlot->refreshScreen();
+}
+
+QFont MainWindow::changeFonts(QWidget *targetWidget)
+{
+    qDebug()<<"change fonts";
+    auto _font = targetWidget->font();
+    qDebug()<< targetWidget->font();
+    bool _ok;
+    _font = QFontDialog::getFont(&_ok, _font);
+    if(_ok) {
+        targetWidget->setFont(_font);
+    }
+    return _font;
+}
+
+void MainWindow::updateFonts()
+{
+    leftside->setFont(leftFont);
+    wavePlot->setFont(rightFont);
+}
+
+void MainWindow::loadDefaultSetting()
+{
+    QString _defaultDir = QDir(QDir::homePath()).filePath(SETTING_FOLDER_DEFAULT);
+    QString _defaultFile = QDir(_defaultDir).filePath(SETTING_FILE_DEFAULT);
+    _loadSettings(_defaultFile);
 }
 
 // Enable or disable the display of electrode impedances.

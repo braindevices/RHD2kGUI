@@ -147,7 +147,15 @@ private slots:
 
     //add by Ling Wang for EIS test
     void changeImpedanceFrequencyVec();
+    void isAutoSaveEIS(bool);
+    void isRunEIS(bool);
+    void saveLWESettings();
     //end add by Ling Wang for EIS test
+
+    //add by Ling Wang to improve GUI
+    void changeLFonts();
+    void changeRFonts();
+    //end add by Ling Wang to improve GUI
 
 private:
     void createActions();
@@ -377,6 +385,18 @@ private:
     void appendEISdataInSingalsources(double freq);
     void saveImpedancesCSV(QString csvFileName);
     void write1FreqEISfor1Chan(SignalChannel *signalChannel, QTextStream& out, int idx);
+    QString createEISfilename();
+    bool autoSaveEIS;
+    QCheckBox *autoSaveEISCheckBox;
+    bool autoRunEIS;
+    QCheckBox *autoRunEISCheckBox;
+
+    QAction *saveLWESettingsAction;
+
+    QMenu *fontsMenu;
+    QAction *changeLFontsAction;
+    QAction *changeRFontsAction;
+
     //end add by Ling Wang for EIS test
 };
 

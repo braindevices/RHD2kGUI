@@ -61,5 +61,5 @@ private:
 
 };
 void textToValueVec(QString text, QVector<double> *pVec);
-QString valueVecToText(QVector<double> *pVec, int precision);
+QString valueVecToText(QVector<double> *pVec, int precision = -1);
 #endif // IMPEDANCEFREQLISTDIALOG_H

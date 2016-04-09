@@ -74,6 +74,7 @@ MainWindow::MainWindow()
     // Default electrode impedance measurement frequency
     desiredImpedanceFreq = 1000.0;
     desiredImpedanceFreqVec = {30, 100, 300, 1000}; //add by Ling Wang for EIS test
+    autoSaveEIS = false;
 
     actualImpedanceFreq = 0.0;
     impedanceFreqValid = false;
@@ -280,11 +281,13 @@ void MainWindow::createLayout()
     int i;
 
     setWindowIcon(QIcon(":/images/Intan_Icon_32p_trans24.png"));
-    setFixedSize(1245, 750);
+//    setFixedSize(1245, 750); // this probably required by wavePlot
+    setMinimumSize(1245, 750);
 
     runButton = new QPushButton(tr("&Run"));
     stopButton = new QPushButton(tr("&Stop"));
     recordButton = new QPushButton(tr("Record"));
+    autoRunEISCheckBox = new QCheckBox(tr("AutoRunEIS"));
     triggerButton = new QPushButton(tr("Trigger"));
     baseFilenameButton = new QPushButton(tr("Select Base Filename"));
     setSaveFormatButton = new QPushButton(tr("Select File Format"));
@@ -433,6 +436,7 @@ void MainWindow::createLayout()
     connect(runButton, SIGNAL(clicked()), this, SLOT(runInterfaceBoard()));
     connect(stopButton, SIGNAL(clicked()), this, SLOT(stopInterfaceBoard()));
     connect(recordButton, SIGNAL(clicked()), this, SLOT(recordInterfaceBoard()));
+    connect(autoRunEISCheckBox, SIGNAL(clicked(bool)), this, SLOT(isRunEIS(bool)));
     connect(triggerButton, SIGNAL(clicked()), this, SLOT(triggerRecordInterfaceBoard()));
     connect(baseFilenameButton, SIGNAL(clicked()), this, SLOT(selectBaseFilenameSlot()));
     connect(changeBandwidthButton, SIGNAL(clicked()), this, SLOT(changeBandwidth()));
@@ -482,6 +486,7 @@ void MainWindow::createLayout()
     runButton->setFixedWidth(70);
     stopButton->setFixedWidth(70);
     recordButton->setFixedWidth(70);
+    // autoRunEISCheckBox->setFixedWidth(70);
     triggerButton->setFixedWidth(70);
 
     QHBoxLayout *runStopLayout = new QHBoxLayout;
@@ -495,6 +500,7 @@ void MainWindow::createLayout()
     QHBoxLayout *recordLayout = new QHBoxLayout;
     recordLayout->addWidget(recordButton);
     recordLayout->addWidget(triggerButton);
+    recordLayout->addWidget(autoRunEISCheckBox);
     recordLayout->addWidget(setSaveFormatButton);
     recordLayout->addStretch(1);
 
@@ -560,6 +566,11 @@ void MainWindow::createLayout()
     connect(showImpedanceCheckBox, SIGNAL(clicked(bool)),
             this, SLOT(showImpedances(bool)));
 
+    autoSaveEISCheckBox = new QCheckBox(tr("Save Measured Electrode Impedances based on basefilename"));
+    connect(autoSaveEISCheckBox, SIGNAL(clicked(bool)),
+            this, SLOT(isAutoSaveEIS(bool)));
+
+
     saveImpedancesButton = new QPushButton(tr("Save Impedance Measurements in CSV Format"));
     saveImpedancesButton->setEnabled(false);
     connect(saveImpedancesButton, SIGNAL(clicked()),
@@ -577,14 +588,17 @@ void MainWindow::createLayout()
     saveImpedancesLayout->addWidget(saveImpedancesButton);
     saveImpedancesLayout->addStretch(1);
 
-    desiredImpedanceFreqLabel = new QLabel(tr("Desired Impedance Test Frequency: -"));
-    actualImpedanceFreqLabel = new QLabel(tr("Actual Impedance Test Frequency: -"));
+    desiredImpedanceFreqLabel = new QLabel(tr("Desired Impedance Test Frequency:\n -"));
+    desiredImpedanceFreqLabel->setWordWrap(true);
+    actualImpedanceFreqLabel = new QLabel(tr("Actual Impedance Test Frequency:\n -"));
+    actualImpedanceFreqLabel->setWordWrap(true);
 
     QVBoxLayout *impedanceLayout = new QVBoxLayout();
     impedanceLayout->addLayout(impedanceFreqSelectLayout);
     impedanceLayout->addWidget(desiredImpedanceFreqLabel);
     impedanceLayout->addWidget(actualImpedanceFreqLabel);
     impedanceLayout->addLayout(runImpedanceTestLayout);
+    impedanceLayout->addWidget(autoSaveEISCheckBox);
     impedanceLayout->addWidget(showImpedanceCheckBox);
     impedanceLayout->addLayout(saveImpedancesLayout);
     impedanceLayout->addWidget(new QLabel(tr("(Impedance measurements are also saved with data.)")));
@@ -940,14 +954,24 @@ void MainWindow::createLayout()
     leftLayout->addWidget(tabWidget1);
     leftLayout->addStretch(1);
 
-    QHBoxLayout *mainLayout = new QHBoxLayout;
-    mainLayout->addLayout(leftLayout);
-    mainLayout->addWidget(wavePlot);
+//    QHBoxLayout *mainLayout = new QHBoxLayout;
+//    mainLayout->addLayout(leftLayout);
+//    mainLayout->addWidget(wavePlot);
+    QWidget *leftside = new QWidget;
+    leftside->setLayout(leftLayout);
 
-    QWidget *mainWidget = new QWidget;
-    mainWidget->setLayout(mainLayout);
 
-    setCentralWidget(mainWidget);
+    QSplitter *hSplitter = new QSplitter(Qt::Horizontal, this);
+    hSplitter->addWidget(leftside);
+    hSplitter->addWidget(wavePlot);
+
+    setCentralWidget(hSplitter);
+
+
+//    QWidget *mainWidget = new QWidget;
+//    mainWidget->setLayout(mainLayout);
+
+//    setCentralWidget(mainWidget);
 
     wavePlot->setFocus();
 
@@ -963,10 +987,16 @@ void MainWindow::createActions()
     connect(loadSettingsAction, SIGNAL(triggered()),
             this, SLOT(loadSettings()));
 
-    saveSettingsAction = new QAction(tr("Save Settings"), this);
-    saveSettingsAction->setShortcut(tr("Ctrl+S"));
+    saveSettingsAction = new QAction(tr("Save Standard Settings"), this);
+//    saveSettingsAction->setShortcut(tr("Ctrl+S"));
     connect(saveSettingsAction, SIGNAL(triggered()),
             this, SLOT(saveSettings()));
+
+    saveLWESettingsAction = new QAction(tr("Save Settings"), this);
+    saveLWESettingsAction->setShortcut(tr("Ctrl+S"));
+    connect(saveLWESettingsAction, SIGNAL(triggered()),
+            this, SLOT(saveLWESettings()));
+
 
     exitAction = new QAction(tr("E&xit"), this);
     exitAction->setShortcut(tr("Ctrl+Q"));
@@ -1027,6 +1057,7 @@ void MainWindow::createMenus()
 {
     fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(loadSettingsAction);
+    fileMenu->addAction(saveLWESettingsAction);
     fileMenu->addAction(saveSettingsAction);
     fileMenu->addSeparator();
     fileMenu->addAction(exitAction);
@@ -1234,6 +1265,18 @@ void MainWindow::changeImpedanceFrequencyVec()
 
 }
 
+void MainWindow::isAutoSaveEIS(bool flag)
+{
+    autoSaveEIS = flag;
+    qDebug()<< "qutoSaveEIS = "<<autoSaveEIS;
+}
+
+void MainWindow::isRunEIS(bool flag)
+{
+    autoRunEIS = flag;
+    qDebug() << "autoRunEIS = "<<flag;
+}
+
 // Update electrode impedance measurement frequency, after checking that
 // requested test frequency lies within acceptable ranges based on the
 // amplifier bandwidth and the sampling rate.  See impedancefreqdialog.cpp
@@ -1257,7 +1300,7 @@ void MainWindow::updateImpedanceFrequency()
 
     actualImpedanceFreqVec.clear();
     if (!desiredImpedanceFreqVec.empty()) {
-        desiredImpedanceFreqLabel->setText("Desired Impedance Test Frequency: " +
+        desiredImpedanceFreqLabel->setText("Desired Impedance Test Frequency:\n" +
                                            valueVecToText(&desiredImpedanceFreqVec, 0) +
                                            " Hz");
         foreach(auto _deF, desiredImpedanceFreqVec)
@@ -1280,16 +1323,16 @@ void MainWindow::updateImpedanceFrequency()
         actualImpedanceFreq = 0;
 
     } else {
-        desiredImpedanceFreqLabel->setText("Desired Impedance Test Frequency: -");
+        desiredImpedanceFreqLabel->setText("Desired Impedance Test Frequency:\n -");
         actualImpedanceFreq = 0.0;
         impedanceFreqValid = false;
     }
     if (impedanceFreqValid) {
-        actualImpedanceFreqLabel->setText("Actual Impedance Test Frequency: " +
+        actualImpedanceFreqLabel->setText("Actual Impedance Test Frequency:\n " +
                                           valueVecToText(&actualImpedanceFreqVec, 1) +
                                           " Hz");
     } else {
-        actualImpedanceFreqLabel->setText("Actual Impedance Test Frequency: -");
+        actualImpedanceFreqLabel->setText("Actual Impedance Test Frequency:\n -");
     }
     runImpedanceTestButton->setEnabled(impedanceFreqValid);
     qDebug()<<"end MainWindow::updateImpedanceFrequency()";
@@ -2375,6 +2418,9 @@ int MainWindow::deviceId(Rhd2000DataBlock *dataBlock, int stream, int &register5
 // Start recording data from USB interface board to disk.
 void MainWindow::recordInterfaceBoard()
 {
+    if (autoRunEIS){
+        runEISMeasurement();
+    }
     // Create list of enabled channels that will be saved to disk.
     signalProcessor->createSaveList(signalSources);
 
@@ -3002,13 +3048,26 @@ void MainWindow::loadSettings()
     quint32 tempQuint32;
     qint32 tempQint32;
     int versionMain, versionSecondary;
-
+    bool useLWE = false;
+    int versionLWEMain = 0, versionLWESecondary = 0;
     inStream >> tempQuint32;
     if (tempQuint32 != SETTINGS_FILE_MAGIC_NUMBER) {
-        QMessageBox::critical(this, tr("Cannot Parse Settings File"),
-                              tr("Selected file is not a valid settings file."));
-        wavePlot->setFocus();
-        return;
+        if(tempQuint32 != SETTINGS_FILE_LWE_MAGIC_NUMBER) {
+            QMessageBox::critical(this, tr("Cannot Parse Settings File"),
+                                  tr("Selected file is not a valid settings file."));
+            wavePlot->setFocus();
+            return;
+        }
+        else {
+            QMessageBox::information(this, tr("restoring settings"), "Load from LW enhanced setting file.");
+            useLWE = true;
+
+        }
+
+    }
+    else {
+        QMessageBox::warning(this, tr("restoring standard settings"), "Load from standard setting file.\n LW enhanced settings will not be restored!");
+        useLWE = false;
     }
 
     statusBar()->showMessage("Restoring settings from file...");
@@ -3289,11 +3348,35 @@ void MainWindow::loadSettings()
                 evalBoard->setCableDelay(Rhd2000EvalBoard::PortD, manualDelay[3]);
             }
         }
-        inStream >> desiredImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
-        inStream >> actualImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
+
 
     }
     qDebug()<<"version 1.4 done";
+
+    if (useLWE) {
+        inStream >> tempQint16;
+        versionLWEMain = tempQint16;
+        inStream >> tempQint16;
+        versionLWESecondary = tempQint16;
+        qDebug()<<"version: "<<versionLWEMain<<"."<<versionLWESecondary;
+    }
+
+    qDebug() <<"LWE version 0.1";
+    if((versionLWEMain == 0 && versionSecondary >= 1) || (versionMain > 0)) {
+        inStream >> desiredImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
+        inStream >> actualImpedanceFreqVec; //this actually works, but the dialog value is not up-to-date, need click the select freq dialog to update
+        inStream >> tempQint16;
+        autoSaveEIS = (bool)tempQint16;
+        autoSaveEISCheckBox->setChecked(autoSaveEIS);
+
+        inStream >> tempQint16;
+        autoRunEIS = (bool)tempQint16;
+        autoRunEISCheckBox->setChecked(autoRunEIS);
+
+
+    }
+
+    qDebug() <<"LWE version 0.1 done";
 
     settingsFile.close();
 
@@ -3430,6 +3513,145 @@ void MainWindow::saveSettings()
     wavePlot->setFocus();
 }
 
+
+
+void MainWindow::saveLWESettings()
+{
+    QString saveSettingsFileName;
+    saveSettingsFileName = QFileDialog::getSaveFileName(this,
+                                            tr("Select Settings Filename"), ".",
+                                            tr("Intan Settings Files (*.isf)"));
+
+    if (saveSettingsFileName.isEmpty()) {
+        wavePlot->setFocus();
+        return;
+    }
+
+    QFile settingsFile(saveSettingsFileName);
+    if (!settingsFile.open(QIODevice::WriteOnly)) {
+        QMessageBox::critical(this, tr("Cannot Save Settings File"),
+                              tr("Cannot open new settings file for writing."));
+        wavePlot->setFocus();
+        return;
+    }
+
+    statusBar()->showMessage("Saving settings to file...");
+
+    // Save settings
+    QDataStream outStream(&settingsFile);
+    outStream.setVersion(QDataStream::Qt_4_8);
+    outStream.setByteOrder(QDataStream::LittleEndian);
+    outStream.setFloatingPointPrecision(QDataStream::SinglePrecision);
+
+    //LW enhanced parameters
+    outStream << (quint32) SETTINGS_FILE_LWE_MAGIC_NUMBER;
+    //standard parameters
+    outStream << (qint16) SETTINGS_FILE_MAIN_VERSION_NUMBER;
+    outStream << (qint16) SETTINGS_FILE_SECONDARY_VERSION_NUMBER;
+
+    outStream << *signalSources;
+
+    outStream << (qint16) sampleRateComboBox->currentIndex();
+    outStream << (qint16) yScaleComboBox->currentIndex();
+    outStream << (qint16) tScaleComboBox->currentIndex();
+    outStream << (qint16) notchFilterComboBox->currentIndex();
+    outStream << saveBaseFileName;
+    outStream << (qint16) newSaveFilePeriodMinutes;
+    outStream << (qint16) dspEnabled;
+    outStream << desiredDspCutoffFreq;
+    outStream << desiredLowerBandwidth;
+    outStream << desiredUpperBandwidth;
+    outStream << desiredImpedanceFreq;
+    outStream << actualImpedanceFreq;
+    outStream << (qint16) impedanceFreqValid;
+    outStream << (qint16) dacGainSlider->value();
+    outStream << (qint16) dacNoiseSuppressSlider->value();
+    for (int i = 0; i < 8; ++i) {
+        outStream << (qint16) dacEnabled[i];
+        if (dacSelectedChannel[i]) {
+            outStream << dacSelectedChannel[i]->nativeChannelName;
+        } else {
+            outStream << QString("");
+        }
+    }
+    outStream << (qint16) fastSettleEnabled;
+    outStream << (qint16) plotPointsCheckBox->isChecked();
+    outStream << note1LineEdit->text();
+    outStream << note2LineEdit->text();
+    outStream << note3LineEdit->text();
+
+    // We need to save the ports in reverse order to make things
+    // work out correctly when we load them again.
+    for (int port = 5; port >= 0; --port) {
+        outStream << (qint16) wavePlot->getNumFramesIndex(port);
+        outStream << (qint16) wavePlot->getTopLeftFrame(port);
+    }
+
+    outStream << (qint16) saveTemp;     // version 1.1 addition
+
+    outStream << (qint16) recordTriggerChannel;     // version 1.2 additions
+    outStream << (qint16) recordTriggerPolarity;
+    outStream << (qint16) recordTriggerBuffer;
+
+    outStream << (qint16) saveFormat;
+    outStream << (qint16) dacLockToSelectedBox->isChecked();
+
+    // version 1.3 additions
+    outStream << (qint32) dac1ThresholdSpinBox->value();
+    outStream << (qint32) dac2ThresholdSpinBox->value();
+    outStream << (qint32) dac3ThresholdSpinBox->value();
+    outStream << (qint32) dac4ThresholdSpinBox->value();
+    outStream << (qint32) dac5ThresholdSpinBox->value();
+    outStream << (qint32) dac6ThresholdSpinBox->value();
+    outStream << (qint32) dac7ThresholdSpinBox->value();
+    outStream << (qint32) dac8ThresholdSpinBox->value();
+
+    outStream << (qint16) saveTtlOut;
+
+    outStream << (qint16) highpassFilterEnabled;
+    outStream << highpassFilterFrequency;
+
+    // version 1.4 additions
+    outStream << (qint16) externalFastSettleCheckBox->isChecked();
+    outStream << (qint16) externalFastSettleSpinBox->value();
+
+    outStream << (qint16) auxDigOutEnabled[0];
+    outStream << (qint16) auxDigOutEnabled[1];
+    outStream << (qint16) auxDigOutEnabled[2];
+    outStream << (qint16) auxDigOutEnabled[3];
+
+    outStream << (qint16) auxDigOutChannel[0];
+    outStream << (qint16) auxDigOutChannel[1];
+    outStream << (qint16) auxDigOutChannel[2];
+    outStream << (qint16) auxDigOutChannel[3];
+
+    outStream << (qint16) manualDelayEnabled[0];
+    outStream << (qint16) manualDelayEnabled[1];
+    outStream << (qint16) manualDelayEnabled[2];
+    outStream << (qint16) manualDelayEnabled[3];
+
+    outStream << (qint16) manualDelay[0];
+    outStream << (qint16) manualDelay[1];
+    outStream << (qint16) manualDelay[2];
+    outStream << (qint16) manualDelay[3];
+
+    //LW enhanced parameters
+//    outStream << (quint32) SETTINGS_FILE_LWE_MAGIC_NUMBER;
+    outStream << (qint16) SETTINGS_FILE_LWE_MAIN_VERSION_NUMBER;
+    outStream << (qint16) SETTINGS_FILE_LWE_SECONDARY_VERSION_NUMBER;
+
+
+    outStream << desiredImpedanceFreqVec;
+    outStream << actualImpedanceFreqVec;
+    outStream << (qint16) autoSaveEIS;
+    outStream << (qint16) autoRunEIS;
+
+    settingsFile.close();
+
+    statusBar()->clearMessage();
+    wavePlot->setFocus();
+}
+
 // Enable or disable the display of electrode impedances.
 void MainWindow::showImpedances(bool enabled)
 {
@@ -3481,7 +3703,9 @@ void MainWindow::runImpedanceMeasurement()
     statusBar()->showMessage("Measuring electrode impedances...");
 
     // Create a progress bar to let user know how long this will take.
-    QProgressDialog progress("Measuring Electrode Impedances", "Abort", 0, 98, this);
+    QString _progressMessage = "Measuring Electrode Impedances at %1 Hz with %2 S/s";
+    _progressMessage = _progressMessage.arg(actualImpedanceFreq).arg(boardSampleRate);
+    QProgressDialog progress(_progressMessage, "Abort", 0, 98, this);
     progress.setWindowTitle("Progress");
     progress.setMinimumDuration(0);
     progress.setModal(true);
@@ -3875,6 +4099,7 @@ void MainWindow::appendEISdataInSingalsources(double freq)
 void MainWindow::runEISMeasurement()
 {
     qDebug()<<"runEISMeasurement()";
+    autoSaveEISCheckBox->setEnabled(false);
     // We can't really measure impedances in demo mode, so just return.
     if (synthMode) {
         qDebug()<<"We can't really measure impedances in demo mode, so just return.";
@@ -3894,6 +4119,13 @@ void MainWindow::runEISMeasurement()
 
 
     }
+
+    if (autoSaveEIS) {
+        auto _filename = createEISfilename();
+        saveImpedancesCSV(_filename);
+    }
+
+    autoSaveEISCheckBox->setEnabled(true);
     qDebug()<<"end runEISMeasurement()";
 }
 
@@ -3919,7 +4151,7 @@ void MainWindow::write1FreqEISfor1Chan(SignalChannel *signalChannel, QTextStream
     out << signalChannel->signalGroup->name << ",";
     out << signalChannel->enabled << ",";
 
-    out <<signalChannel->EISFreqVec[idx],
+    out <<signalChannel->EISFreqVec[idx]<< ",";
 
     out << _electrodeImpedanceMagnitude << ",";
 
@@ -3935,6 +4167,22 @@ void MainWindow::write1FreqEISfor1Chan(SignalChannel *signalChannel, QTextStream
     out << equivalentC << endl;
 }
 
+QString MainWindow::createEISfilename()
+{
+    QFileInfo fileInfo(saveBaseFileName);
+    QDateTime dateTime = QDateTime::currentDateTime();
+    QString sEISfileName = fileInfo.path();
+    sEISfileName += "/";
+    sEISfileName += fileInfo.baseName();
+    sEISfileName += "_EIS_";
+    sEISfileName += dateTime.toString("yyMMdd");    // date stamp
+    sEISfileName += "_";
+    sEISfileName += dateTime.toString("HHmmss");    // time stamp
+    sEISfileName += ".csv";
+
+    return sEISfileName;
+}
+
 void MainWindow::saveImpedancesCSV(QString csvFileName)
 {
     if (!csvFileName.isEmpty()) {
@@ -3947,8 +4195,8 @@ void MainWindow::saveImpedancesCSV(QString csvFileName)
         QTextStream out(&csvFile);
 
         out << "Channel Number,Channel Name,Port,Enabled,";
-        out << "Impedance Magnitude at " << actualImpedanceFreq << " Hz (ohms),";
-        out << "Impedance Phase at " << actualImpedanceFreq << " Hz (degrees),";
+        out << "Impedance Magnitude at " << valueVecToText(&actualImpedanceFreqVec) << " Hz (ohms),";
+        out << "Impedance Phase (degrees),";
         out << "Series RC equivalent R (Ohms),";
         out << "Series RC equivalent C (Farads)" << endl;
 
@@ -4036,7 +4284,7 @@ void MainWindow::setSaveFormat(SaveFormat format)
 
 // Create and open a new save file for data (saveFile), and create a new
 // data stream (saveStream) for writing to the file.
-void MainWindow::startNewSaveFile(SaveFormat format)
+void MainWindow::  startNewSaveFile(SaveFormat format)
 {
     QFileInfo fileInfo(saveBaseFileName);
     QDateTime dateTime = QDateTime::currentDateTime();

@@ -1,8 +1,8 @@
 QMAKE_CXXFLAGS += -std=c++11
 TEMPLATE      = app
-
 QT            += widgets
-greaterThan(4, QT_MAJOR_VERSION): QT += multimedia
+greaterThan(QT_MAJOR_VERSION, 4): QT += multimedia
+#QT += multimedia
 CONFIG        += static
 
 HEADERS       = \
@@ -35,7 +35,8 @@ HEADERS       = \
     auxdigoutconfigdialog.h \
     cabledelaydialog.h \
     helpdialogfastsettle.h \
-    impedancefreqListdialog.h
+    impedancefreqListdialog.h \
+    changefontsdialog.h
 
 SOURCES       = main.cpp \
     okFrontPanelDLL.cpp \
@@ -65,7 +66,8 @@ SOURCES       = main.cpp \
     auxdigoutconfigdialog.cpp \
     cabledelaydialog.cpp \
     helpdialogfastsettle.cpp \
-    impedancefreqListdialog.cpp
+    impedancefreqListdialog.cpp \
+    changefontsdialog.cpp
     
 RESOURCES     = RHD2000interface.qrc
 LIBS+=-lm
@@ -93,3 +95,5 @@ QMAKE_CFLAGS_RELEASE -= -O2
 QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE += -O3
+
+FORMS +=

@@ -72,6 +72,7 @@ ImpedanceFreqListDialog::ImpedanceFreqListDialog(QVector<double> *pDesiredImpeda
     sampleRangeText.append(QString::number(upperLimitSample, 'f', 0));
     sampleRangeText.append(" Hz.");
     sampleRangeLabel = new QLabel(sampleRangeText);
+    sampleRangeLabel->setWordWrap(true);
 
     bandwidth1RangeLabel = new QLabel(tr("For acceptable accuracy, the frequency should "
                                          "lie within the amplifier bandwidth by a factor of 1.5."));
@@ -83,6 +84,7 @@ ImpedanceFreqListDialog::ImpedanceFreqListDialog(QVector<double> *pDesiredImpeda
     bandwidthRangeText.append(QString::number(upperLimitBandwidth, 'f', 0));
     bandwidthRangeText.append(" Hz.");
     bandwidth2RangeLabel = new QLabel(bandwidthRangeText);
+    bandwidth2RangeLabel->setWordWrap(true);
 
     QHBoxLayout *impedanceFreqSelectLayout = new QHBoxLayout;
     impedanceFreqSelectLayout->addWidget(new QLabel(tr("Electrode Impedance Measurement Frequency")));
@@ -156,7 +158,7 @@ void textToValueVec(QString text, QVector<double> *pVec)
     }
 }
 
-QString valueVecToText(QVector<double> *pVec, int precision = -1)
+QString valueVecToText(QVector<double> *pVec, int precision)
 {
     QString text;
     QString numFormat(" %1,");

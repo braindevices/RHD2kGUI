@@ -43,6 +43,59 @@ If the scanning frequencies are: 300, 600, 1k, 2k, and 3.75k, then the loaded da
 | A-001          | A-001        | Port A | 1       | 3.750000e+03 | 1.053514e+05     | -96.2           | -1.130027e+04                 | 4.051925e-10                    |
 | A-002          | A-002        | Port A | 1       | 3.000000e+02 | 8.124212e+06     | -91.6           | -2.254001e+05                 | 5.226065e-12                    |
 
+### load the csv data
+We can use the popular python package pandas to load the data:
+
+```
+import pandas as pd
+columns = ['Channel Number','Channel Name','Port','Enabled','Hz','Impedance (ohms)', 'Phase (degrees)','Series RC equivalent R (Ohms)','Series RC equivalent C (Farads)']
+a = pd.read_csv('Serum_Media_on_EIS_160511_012211.csv', sep = ',', skiprows=[0,], names =columns, index_col=[0, 4]) # this will use the channel number and the frequency as 2-level index.
+```
+Access the loaded data is quite easy now:
+```
+>>> a.loc['A-000']
+       Channel Name    Port  Enabled  Impedance (ohms)  Phase (degrees)  \
+Hz                                                                        
+300.0         A-000  Port A        1         4657420.0            -72.9   
+600.0         A-000  Port A        1         3075658.0            -83.5   
+1000.0        A-000  Port A        1         1837914.0            -87.4   
+2000.0        A-000  Port A        1          871817.1            -97.8   
+3750.0        A-000  Port A        1          446640.0           -109.0   
+
+        Series RC equivalent R (Ohms)  Series RC equivalent C (Farads)  
+Hz                                                                      
+300.0                      1371045.00                     9.535137e-12  
+600.0                       346160.40                     1.388734e-11  
+1000.0                       83771.71                     2.311613e-11  
+2000.0                     -118615.20                     4.913837e-11  
+3750.0                     -145454.90                     1.005024e-10  
+```
+Now it can be plotted by `matplotlib`
+
+```
+import matplotlib.pyplot as plt
+ def plot_eis(a, channel):
+	impedance = a.loc[channel]['Impedance (ohms)']
+	phase = a.loc[channel]['Phase (degrees)']
+	fig,ax=plt.subplots()
+	ax2 = ax.twinx()
+	_ips = ax.plot(impedance/1E6, label='impedance (Mohms)', color='C0')
+	_phs = ax2.plot(phase, label='phase (degrees)', color='C1')
+	lns = _ips + _phs
+	labs = [l.get_label() for l in lns]
+	ax.set_xscale('log', nonposx='clip')
+	ax.legend(lns, labs)
+	ax.grid()
+	ax.set_xlabel("Freqency (Hz)")
+	ax.set_ylabel(r"Z (M$\Omega$)")
+	ax2.set_ylabel(r"Phase ($^\circ$)")
+	plt.show()
+
+plot_eis(a, 'A-005')
+```
+The result looks like this: ![eisplot](doc/eis_example_z_phase_freq.eps)
+
+
 ## Change the fonts
 It is very common, that one find the default font does not work under their OS/Display settings. For example: ![beforefontchange](doc/before_changefont.png) We can see the font is too big making the text unreadable in both left and right panels. 
 In standard edition, we have to change the system fonts to sovle this issue which is very annoying.

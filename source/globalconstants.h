@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.4
-//  Copyright (C) 2013-2014 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -42,12 +42,12 @@
 // Saved data file constants
 #define DATA_FILE_MAGIC_NUMBER  0xc6912702
 #define DATA_FILE_MAIN_VERSION_NUMBER  1
-#define DATA_FILE_SECONDARY_VERSION_NUMBER  4
+#define DATA_FILE_SECONDARY_VERSION_NUMBER 5
 
 // Saved settings file constants
 #define SETTINGS_FILE_MAGIC_NUMBER  0x45ab12cd
 #define SETTINGS_FILE_MAIN_VERSION_NUMBER  1
-#define SETTINGS_FILE_SECONDARY_VERSION_NUMBER  4
+#define SETTINGS_FILE_SECONDARY_VERSION_NUMBER  5
 
 // RHD2000 chip ID numbers from ROM register 63
 #define CHIP_ID_RHD2132  1

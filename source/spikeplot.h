@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -26,7 +26,6 @@
 #define SPIKEPLOT_Y_SIZE 346
 
 #include <QWidget>
-#include "qtincludes.h"
 
 using namespace std;
 
@@ -64,11 +63,13 @@ protected:
     void mousePressEvent(QMouseEvent *event);
     void wheelEvent(QWheelEvent *event);
     void keyPressEvent(QKeyEvent *event);
+    void resizeEvent(QResizeEvent* event);
 
 private:
     void drawAxisLines();
     void drawAxisText();
     void updateSpikePlot(double rms);
+    void initializeDisplay();
 
     SignalProcessor *signalProcessor;
     SpikeScopeDialog *spikeScopeDialog;

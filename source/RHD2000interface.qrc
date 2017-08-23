@@ -7,5 +7,6 @@
         <file>images/help_diagram_DACs.png</file>
         <file>images/help_diagram_notch_filter.png</file>
         <file>images/help_diagram_software_HPFs.png</file>
+        <file>sounds/triggerendbeep.wav</file>
     </qresource>
 </RCC>

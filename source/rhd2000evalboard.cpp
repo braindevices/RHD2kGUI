@@ -3,9 +3,9 @@
 //
 // Intan Technoloies RHD2000 Rhythm Interface API
 // Rhd2000EvalBoard Class
-// Version 1.4 (26 February 2014)
+// Version 1.5.2 (24 July 2017)
 //
-// Copyright (c) 2013-2014 Intan Technologies LLC
+// Copyright (c) 2013-2017 Intan Technologies LLC
 //
 // This software is provided 'as-is', without any express or implied warranty.
 // In no event will the authors be held liable for any damages arising from the
@@ -87,10 +87,14 @@ int Rhd2000EvalBoard::open()
         }
     }
 
+    cout << "Attempting to connect to device '" << serialNumber.c_str() << "'\n";
+
+    okCFrontPanel::ErrorCode result = dev->OpenBySerial(serialNumber);
     // Attempt to open device.
-    if (dev->OpenBySerial(serialNumber) != okCFrontPanel::NoError) {
+    if (result != okCFrontPanel::NoError) {
         delete dev;
         cerr << "Device could not be opened.  Is one connected?" << endl;
+        cerr << "Error = " << result << "\n";
         return -2;
     }
 
@@ -721,7 +725,7 @@ void Rhd2000EvalBoard::setCableDelay(BoardPort port, int delay)
     int bitShift;
 
     if (delay < 0 || delay > 15) {
-        cerr << "Warning in Rhd2000EvalBoard::setCableDelay: delay out of range: " << delay  << endl;
+        cerr << "Warning in Rhd2000EvalBoard::setCableDelay: delay out of range: " << delay << endl;
     }
 
     if (delay < 0) delay = 0;
@@ -1351,9 +1355,78 @@ bool Rhd2000EvalBoard::readDataBlocks(int numBlocks, queue<Rhd2000DataBlock> &da
         return false;
     }
 
+
     dev->ReadFromPipeOut(PipeOutData, numBytesToRead, usbBuffer);
 
     dataBlock = new Rhd2000DataBlock(numDataStreams);
+
+    // USB data error checking added for version 1.5
+
+    /*
+    // Spoof USB glitches by dropping bytes (for debugging purposes only)
+    static int glitchCounter = 0;
+    if (glitchCounter++ == 50) {
+        // Introduce USB 'glitch'
+        glitchCounter = 0;
+        cerr << "USB GLITCH!" << endl;
+
+        unsigned int numWordsToSwallow = 35;
+        unsigned int glitchPosition = 1000;
+
+        // Throw away some words from the USB buffer...
+        for (i = glitchPosition; i < numBytesToRead - 2 * numWordsToSwallow; ++i) {
+            usbBuffer[i] = usbBuffer[i + 2 * numWordsToSwallow];
+        }
+        // ...and fill the buffer back up from the USB port.
+        while (numWordsInFifo() < numWordsToSwallow) { }
+        dev->ReadFromPipeOut(PipeOutData, 2 * numWordsToSwallow, &usbBuffer[numBytesToRead - 2 * numWordsToSwallow]);
+    }
+    */
+
+    // Look for proper 'magic number' header in all data blocks to check for USB glitches
+    unsigned int dataBlockSizeInBytes = 2 * dataBlock->calculateDataBlockSizeInWords(numDataStreams);
+    unsigned int sampleSizeInBytes = dataBlockSizeInBytes / SAMPLES_PER_DATA_BLOCK;
+    int sample;
+    int index = 0;
+    int lag;
+    for (sample = 0; sample < numBlocks * SAMPLES_PER_DATA_BLOCK; ++sample) {
+        if (!(dataBlock->checkUsbHeader(usbBuffer, index))) {
+            if (sample > 0) {
+                // If we have a bad data sample header on any sample but the first, we shouldn't trust
+                // the integrity of the prior sample, since it is likely contains a "hole" where missing
+                // USB data should be.  Jump back one sample and try to fix that one.
+                sample--;
+                index -= sampleSizeInBytes;
+                // readAdditionalDataWords(1, index, numBytesToRead);
+            }
+
+            // Search for correct header throughout the sample.
+            lag = sampleSizeInBytes / 2;
+            for (i = 1; i < sampleSizeInBytes / 2; ++i) {
+                if (dataBlock->checkUsbHeader(usbBuffer, index + 2 * i)) {
+                    lag = i;
+                    break;
+                }
+            }
+            // Realign data and read additional words from the USB to refill buffer.
+            readAdditionalDataWords(lag, index, numBytesToRead);
+        }
+        index += sampleSizeInBytes;
+    }
+
+    // Re-check USB headers (for debugging purposes only)
+    /*
+    index = 0;
+    for (sample = 0; sample < numBlocks * SAMPLES_PER_DATA_BLOCK; ++sample) {
+        if (!(dataBlock->checkUsbHeader(usbBuffer, index))) {
+            cerr << "Unfixed header error at sample " << sample << endl;
+        }
+        index += sampleSizeInBytes;
+    }
+    */
+
+    // End of USB error checking added for version 1.5
+
     for (i = 0; i < numBlocks; ++i) {
         dataBlock->fillFromUsbBuffer(usbBuffer, i, numDataStreams);
         dataQueue.push(*dataBlock);
@@ -1361,6 +1434,21 @@ bool Rhd2000EvalBoard::readDataBlocks(int numBlocks, queue<Rhd2000DataBlock> &da
     delete dataBlock;
 
     return true;
+}
+
+void Rhd2000EvalBoard::readAdditionalDataWords(unsigned int numWords, unsigned int errorPoint, unsigned int bufferLength)
+{
+    unsigned int numBytes = 2 * numWords;
+    // Shift all data beyond error point back by N words (2N bytes)...
+    for (unsigned int i = errorPoint; i < bufferLength - numBytes; i += 2) {
+        usbBuffer[i] = usbBuffer[i + numBytes];
+        usbBuffer[i + 1] = usbBuffer[i + numBytes + 1];
+    }
+
+    while (numWordsInFifo() < numWords) { }    // ...wait for data word to become available...
+
+    // ...and read N more words (2N more bytes) from USB, and append it to the end.
+    dev->ReadFromPipeOut(PipeOutData, numBytes, &usbBuffer[bufferLength - numBytes]);
 }
 
 // Writes the contents of a data block queue (dataQueue) to a binary output stream (saveOut).

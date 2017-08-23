@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -23,9 +23,9 @@
 #define TRIGGERRECORDDIALOG_H
 
 #include <QDialog>
-#include "qtincludes.h"
 
 class QDialogButtonBox;
+class QCheckBox;
 class QComboBox;
 class QSpinBox;
 
@@ -34,12 +34,15 @@ class TriggerRecordDialog : public QDialog
     Q_OBJECT
 public:
     explicit TriggerRecordDialog(int initialTriggerChannel, int initialTriggerPolarity,
-                                 int initialTriggerBuffer, QWidget *parent);
+                                 int initialTriggerBuffer, int initialPostTrigger,
+                                 bool initialSaveTriggerChannel, QWidget *parent);
 
     QDialogButtonBox *buttonBox;
+    QCheckBox *saveTriggerChannelCheckBox;
     int digitalInput;
     int triggerPolarity;
     int recordBuffer;
+    int postTriggerTime;
 
 signals:
 
@@ -49,12 +52,14 @@ private slots:
     void setDigitalInput(int index);
     void setTriggerPolarity(int index);
     void recordBufferSeconds(int value);
+    void postTriggerSeconds(int value);
 
 private:
     QComboBox *digitalInputComboBox;
     QComboBox *triggerPolarityComboBox;
 
     QSpinBox *recordBufferSpinBox;
+    QSpinBox *postTriggerSpinBox;
 
 };
 

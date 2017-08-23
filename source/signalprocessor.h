@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -24,7 +24,6 @@
 
 #include <queue>
 #include "mainwindow.h"
-#include "qtincludes.h"
 
 using namespace std;
 
@@ -45,14 +44,14 @@ public:
     void setHighpassFilterEnabled(bool enable);
     int loadAmplifierData(queue<Rhd2000DataBlock> &dataQueue, int numBlocks,
                           bool lookForTrigger, int triggerChannel, int triggerPolarity,
-                          int &triggerIndex, queue<Rhd2000DataBlock> &bufferQueue,
-                          bool saveToDisk, QDataStream &out, SaveFormat format,
-                          bool saveTemp, bool saveTtlOut, int timestampOffset);
+                          int &triggerIndex, bool addToBuffer,
+                          queue<Rhd2000DataBlock> &bufferQueue, bool saveToDisk, QDataStream &out,
+                          SaveFormat format, bool saveTemp, bool saveTtlOut, int timestampOffset);
     int loadSyntheticData(int numBlocks, double sampleRate, bool saveToDisk,
                           QDataStream &out, SaveFormat format, bool saveTemp, bool saveTtlOut);
     int saveBufferedData(queue<Rhd2000DataBlock> &bufferQueue, QDataStream &out, SaveFormat format,
                          bool saveTemp, bool saveTtlOut, int timestampOffset);
-    void createSaveList(SignalSources *signalSources);
+    void createSaveList(SignalSources *signalSources, bool addTriggerChannel, int triggerChannel);
     void createTimestampFilename(QString path);
     void openTimestampFile();
     void closeTimestampFile();

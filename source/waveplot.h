@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.41
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -24,7 +24,6 @@
 
 #include <QWidget>
 #include "signalgroup.h"
-#include "qtincludes.h"
 
 using namespace std;
 
@@ -90,6 +89,7 @@ protected:
     void wheelEvent(QWheelEvent *event);
     void keyPressEvent(QKeyEvent *event);
     void closeEvent(QCloseEvent *event);
+    void resizeEvent(QResizeEvent* event);
 
 private:
     void refreshPixmap();
@@ -136,6 +136,9 @@ private:
     int dragToIndex;
     bool impedanceLabels;
     bool pointPlotMode;
+
+    void createFrames(unsigned int frameIndex, unsigned int maxX, unsigned int maxY);
+    void createAllFrames();
 };
 
 #endif // WAVEPLOT_H

@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -20,9 +20,10 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtGui>
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+#include <QtWidgets>
+#endif
 #include <iostream>
-
-#include "qtincludes.h"
 
 #include "globalconstants.h"
 #include "spikescopedialog.h"
@@ -40,7 +41,6 @@ SpikeScopeDialog::SpikeScopeDialog(SignalProcessor *inSignalProcessor, SignalSou
     QDialog(parent)
 {
     setWindowTitle(tr("Spike Scope"));
-    setFixedSize(482, 395);
 
     signalProcessor = inSignalProcessor;
     signalSources = inSignalSources;
@@ -49,7 +49,6 @@ SpikeScopeDialog::SpikeScopeDialog(SignalProcessor *inSignalProcessor, SignalSou
     currentChannel = initialChannel;
 
     resetToZeroButton = new QPushButton(tr("Zero"));
-    resetToZeroButton->setFixedWidth(35);
     clearScopeButton = new QPushButton(tr("Clear Scope"));
     applyToAllButton = new QPushButton(tr("Apply to Entire Port"));
 
@@ -170,6 +169,8 @@ SpikeScopeDialog::SpikeScopeDialog(SignalProcessor *inSignalProcessor, SignalSou
     QHBoxLayout *mainLayout = new QHBoxLayout;
     mainLayout->addLayout(leftLayout);
     mainLayout->addWidget(spikePlot);
+    mainLayout->setStretch(0, 0);
+    mainLayout->setStretch(1, 1);
 
     setLayout(mainLayout);
 

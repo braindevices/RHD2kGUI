@@ -3,9 +3,9 @@
 //
 // Intan Technoloies RHD2000 Rhythm Interface API
 // Rhd2000Registers Class
-// Version 1.4 (26 February 2014)
+// Version 1.5.2 (24 July 2017)
 //
-// Copyright (c) 2013-2014 Intan Technologies LLC
+// Copyright (c) 2013-2017 Intan Technologies LLC
 //
 // This software is provided 'as-is', without any express or implied warranty.
 // In no event will the authors be held liable for any damages arising from the
@@ -217,8 +217,8 @@ double Rhd2000Registers::setDspCutoffFreq(double newDspCutoffFreq)
     } else {
         minLogDiff = 10000000.0;
         for (n = 1; n < 16; ++n) {
-            if (abs(logNewDspCutoffFreq - logFCutoff[n]) < minLogDiff) {
-                minLogDiff = abs(logNewDspCutoffFreq - logFCutoff[n]);
+            if (fabs(logNewDspCutoffFreq - logFCutoff[n]) < minLogDiff) {
+                minLogDiff = fabs(logNewDspCutoffFreq - logFCutoff[n]);
                 dspCutoffFreq = n;
             }
         }
@@ -828,7 +828,7 @@ int Rhd2000Registers::createCommandListRegisterConfig(vector<int> &commandList, 
     commandList.push_back(createRhd2000Command(Rhd2000CommandRegRead, 63));
 
 
-    return commandList.size();
+    return static_cast<int>(commandList.size());
 }
 
 // Create a list of 60 commands to sample auxiliary ADC inputs, temperature sensor, and supply
@@ -900,7 +900,7 @@ int Rhd2000Registers::createCommandListTempSensor(vector<int> &commandList)
         commandList.push_back(createRhd2000Command(Rhd2000CommandRegRead, 63));      // dummy command
     }
 
-    return commandList.size();
+    return static_cast<int>(commandList.size());
 }
 
 // Create a list of 60 commands to update Register 3 (controlling the auxiliary digital ouput
@@ -969,7 +969,7 @@ int Rhd2000Registers::createCommandListUpdateDigOut(vector<int> &commandList)
         commandList.push_back(createRhd2000Command(Rhd2000CommandRegWrite, 3, getRegisterValue(3)));
     }
 
-    return commandList.size();
+    return static_cast<int>(commandList.size());
 }
 
 // Create a list of up to 1024 commands to generate a sine wave of particular frequency (in Hz) and
@@ -1020,5 +1020,5 @@ int Rhd2000Registers::createCommandListZcheckDac(vector<int> &commandList, doubl
         }
     }
 
-    return commandList.size();
+    return static_cast<int>(commandList.size());
 }

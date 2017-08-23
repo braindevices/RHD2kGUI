@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -25,8 +25,6 @@
 #include <queue>
 #include <qmath.h>
 #include <iostream>
-
-#include "qtincludes.h"
 
 #include "mainwindow.h"
 #include "signalprocessor.h"
@@ -213,7 +211,7 @@ void SignalProcessor::fillZerosDoubleArray2D(
 
 // Creates lists (vectors, actually) of all enabled waveforms to expedite
 // save-to-disk operations.
-void SignalProcessor::createSaveList(SignalSources *signalSources)
+void SignalProcessor::createSaveList(SignalSources *signalSources, bool addTriggerChannel, int triggerChannel)
 {
     int port, index;
     SignalChannel *currentChannel;
@@ -233,6 +231,18 @@ void SignalProcessor::createSaveList(SignalSources *signalSources)
     for (port = 0; port < signalSources->signalPort.size(); ++port) {
         for (index = 0; index < signalSources->signalPort[port].numChannels(); ++index) {
             currentChannel = signalSources->signalPort[port].channelByNativeOrder(index);
+            // Maybe add this channel if it is the trigger channel.
+            if (addTriggerChannel) {
+                if (triggerChannel > 15 && currentChannel->signalType == BoardAdcSignal) {
+                    if (currentChannel->nativeChannelNumber == triggerChannel - 16) {
+                        currentChannel->enabled = true;
+                    }
+                } else if (triggerChannel < 16 && currentChannel->signalType == BoardDigInSignal) {
+                    if (currentChannel->nativeChannelNumber == triggerChannel) {
+                        currentChannel->enabled = true;
+                    }
+                }
+            }
             // Add all enabled channels to their appropriate save list.
             if (currentChannel->enabled) {
                 switch (currentChannel->signalType) {
@@ -537,7 +547,7 @@ void SignalProcessor::closeSaveFiles(SignalSources *signalSources)
 // Returns number of bytes written to binary datastream out if saveToDisk == true.
 int SignalProcessor::loadAmplifierData(queue<Rhd2000DataBlock> &dataQueue,
                                        int numBlocks, bool lookForTrigger, int triggerChannel,
-                                       int triggerPolarity, int &triggerTimeIndex, queue<Rhd2000DataBlock> &bufferQueue,
+                                       int triggerPolarity, int &triggerTimeIndex, bool addToBuffer, queue<Rhd2000DataBlock> &bufferQueue,
                                        bool saveToDisk, QDataStream &out, SaveFormat format, bool saveTemp,
                                        bool saveTtlOut, int timestampOffset)
 {
@@ -955,7 +965,7 @@ int SignalProcessor::loadAmplifierData(queue<Rhd2000DataBlock> &dataQueue,
             }
         }
 
-        if (lookForTrigger) {
+        if (addToBuffer) {
             bufferQueue.push(dataQueue.front());
         }
         // We are done with this Rhd2000DataBlock object; remove it from dataQueue
@@ -1325,7 +1335,7 @@ int SignalProcessor::loadSyntheticData(int numBlocks, double sampleRate,
     bool spikePresent;
     int spikeNum;
 
-    // If the sample rate is 5 kS/s or higher, generate sythetic neural data;
+    // If the sample rate is 5 kS/s or higher, generate synthetic neural data;
     // otherwise, generate synthetic ECG data.
     if (sampleRate > 4999.9) {
         // Generate synthetic neural data.
@@ -1743,9 +1753,11 @@ void SignalProcessor::filterData(int numBlocks,
         // If the notch filter is disabled, simply copy the data without filtering.
         for (stream = 0; stream < numDataStreams; ++stream) {
             for (channel = 0; channel < 32; ++channel) {
-                for (t = 0; t < length; ++t) {
-                    amplifierPostFilter[stream][channel][t] =
-                            amplifierPreFilter.at(stream).at(channel).at(t);
+                if (channelVisible.at(stream).at(channel)) {
+                    for (t = 0; t < length; ++t) {
+                        amplifierPostFilter[stream][channel][t] =
+                                amplifierPreFilter.at(stream).at(channel).at(t);
+                    }
                 }
             }
         }

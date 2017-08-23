@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.41
-//  Copyright (C) 2013-2014 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -26,7 +26,6 @@
 #include <queue>
 #include "rhd2000datablock.h"
 #include "globalconstants.h"
-#include "qtincludes.h"
 
 class QAction;
 class QPushButton;
@@ -182,6 +181,7 @@ private:
     bool running;
     bool recording;
     bool triggerSet;
+    bool triggered;
 
     bool saveTemp;
     bool saveTtlOut;
@@ -230,6 +230,8 @@ private:
     int recordTriggerChannel;
     int recordTriggerPolarity;
     int recordTriggerBuffer;
+    int postTriggerTime;
+    bool saveTriggerChannel;
 
     QVector<bool> auxDigOutEnabled;
     QVector<int> auxDigOutChannel;

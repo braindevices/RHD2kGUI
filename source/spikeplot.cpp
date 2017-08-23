@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -20,10 +20,11 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtGui>
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+#include <QtWidgets>
+#endif
 #include <qmath.h>
 #include <iostream>
-
-#include "qtincludes.h"
 
 #include "globalconstants.h"
 #include "signalprocessor.h"
@@ -59,18 +60,8 @@ SpikePlot::SpikePlot(SignalProcessor *inSignalProcessor, SignalChannel *initialC
 
     setBackgroundRole(QPalette::Window);
     setAutoFillBackground(true);
-    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFocusPolicy(Qt::StrongFocus);
-
-    // An optimization for widgets whose contents don't change when the widget
-    // is resized.
-    setAttribute(Qt::WA_StaticContents);
-
-    // Pixel map used for double buffering.
-    pixmap = QPixmap(SPIKEPLOT_X_SIZE, SPIKEPLOT_Y_SIZE);
-    pixmap.fill(this, 0, 0);
-
-    frame = QRect(52, 23, 260, 300);
 
     int i;
 
@@ -114,18 +105,13 @@ SpikePlot::SpikePlot(SignalProcessor *inSignalProcessor, SignalChannel *initialC
     // Default values that may be overwritten.
     yScale = 5000;
     setSampleRate(30000.0);
-
-    // Initialize display.
-    drawAxisText();
-    drawAxisLines();
 }
 
 // Set voltage scale.
 void SpikePlot::setYScale(int newYScale)
 {
     yScale = newYScale;
-    drawAxisText();
-    drawAxisLines();
+    initializeDisplay();
 }
 
 // Set waveform sample rate.
@@ -176,15 +162,15 @@ void SpikePlot::drawAxisText()
 {
     QPainter painter(&pixmap);
     painter.initFrom(this);
-    const int textBoxWidth = 180;
-    const int textBoxHeight = 20;
+    const int textBoxWidth = painter.fontMetrics().width("+" + QString::number(yScale) + " " + QSTRING_MU_SYMBOL + "V");
+    const int textBoxHeight = painter.fontMetrics().height();
 
     // Clear entire Widget display area.
-    painter.eraseRect(0, 0, SPIKEPLOT_X_SIZE, SPIKEPLOT_Y_SIZE);
+    painter.eraseRect(rect());
 
     // Draw border around Widget display area.
     painter.setPen(Qt::darkGray);
-    QRect rect(0, 0, SPIKEPLOT_X_SIZE - 1, SPIKEPLOT_Y_SIZE - 1);
+    QRect rect(0, 0, width() - 1, height() - 1);
     painter.drawRect(rect);
 
     // If the selected channel is an amplifier channel, then write the channel name and number,
@@ -397,7 +383,7 @@ void SpikePlot::updateSpikePlot(double rms)
 
     // Write RMS value to display.
     const int textBoxWidth = 180;
-    const int textBoxHeight = 20;
+    const int textBoxHeight = painter.fontMetrics().height();
     painter.setPen(Qt::darkGreen);
     painter.drawText(frame.left() + 6, frame.top() + 5,
                       textBoxWidth, textBoxHeight,
@@ -543,6 +529,23 @@ void SpikePlot::setNewChannel(SignalChannel* newChannel)
     digitalTriggerChannel = selectedChannel->digitalTriggerChannel;
     digitalEdgePolarity = selectedChannel->digitalEdgePolarity;
 
+    initializeDisplay();
+}
+
+void SpikePlot::resizeEvent(QResizeEvent*) {
+    // Pixel map used for double buffering.
+    pixmap = QPixmap(size());
+    pixmap.fill();
+    initializeDisplay();
+}
+
+void SpikePlot::initializeDisplay() {
+    const int textBoxWidth = fontMetrics().width("+" + QString::number(yScale) + " " + QSTRING_MU_SYMBOL + "V");
+    const int textBoxHeight = fontMetrics().height();
+    frame = rect();
+    frame.adjust(textBoxWidth + 5, textBoxHeight + 10, -8, -textBoxHeight - 10);
+
+    // Initialize display.
     drawAxisText();
-    drawAxisLines();;
+    drawAxisLines();
 }

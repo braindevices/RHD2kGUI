@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.41
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -20,12 +20,13 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtGui>
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+#include <QtWidgets>
+#endif
 #include <vector>
 #include <queue>
 #include <iostream>
 #include <QtAlgorithms>
-
-#include "qtincludes.h"
 
 #include "globalconstants.h"
 #include "waveplot.h"
@@ -47,16 +48,8 @@ WavePlot::WavePlot(SignalProcessor *inSignalProcessor, SignalSources *inSignalSo
 {
     setBackgroundRole(QPalette::Window);
     setAutoFillBackground(true);
-    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFocusPolicy(Qt::StrongFocus);
-
-    // An optimization for widgets whose contents don't change when the widget
-    // is resized.
-    setAttribute(Qt::WA_StaticContents);
-
-    // Pixel map used for double buffering.
-    pixmap = QPixmap(860, 690);
-    pixmap.fill(this, 0, 0);
 
     signalProcessor = inSignalProcessor;
     signalSources = inSignalSources;
@@ -72,8 +65,6 @@ WavePlot::WavePlot(SignalProcessor *inSignalProcessor, SignalSources *inSignalSo
 // Initialize WavePlot object.
 void WavePlot::initialize(int startingPort)
 {
-    int i, j, port, index;
-
     selectedPort = startingPort;
 
     // This only needs to be as large as the maximum number of frames ever
@@ -92,62 +83,11 @@ void WavePlot::initialize(int startingPort)
     topLeftFrame.resize(6);
     topLeftFrame.fill(0);
 
-    // Create lists of frame (plot window) dimensions for different numbers
-    // of frames per screen.
-
-    frameList.resize(6);
-    frameList[0].resize(1);
-    frameList[1].resize(2);
-    frameList[2].resize(4);
-    frameList[3].resize(8);
-    frameList[4].resize(16);
-    frameList[5].resize(32);
-
-    frameList[0][0] = QRect(5, 15, 850, 641);
-
-    for (i = 0; i < 2; ++i) {
-        frameList[1][i] = QRect(5, 15 + 340 * i, 850, 311);
-    }
-
-    for (i = 0; i < 4; ++i) {
-        frameList[2][i] = QRect(5, 15 + 170 * i, 850, 141);
-    }
-
-    index = 0;
-    for (i = 0; i < 4; ++i) {
-        for (j = 0; j < 2; j++) {
-            frameList[3][index] = QRect(5 + 428 * j, 15 + 170 * i, 422, 141);
-            ++index;
-        }
-    }
-
-    index = 0;
-    for (i = 0; i < 4; ++i) {
-        for (j = 0; j < 4; j++) {
-            frameList[4][index] = QRect(5 + 214 * j, 15 + 170 * i, 208, 141);
-            ++index;
-        }
-    }
-
-    index = 0;
-    for (i = 0; i < 8; ++i) {
-        for (j = 0; j < 4; j++) {
-            frameList[5][index] = QRect(5 + 214 * j, 15 + 85 * i, 208, 61);
-            ++index;
-        }
-    }
-
-    // Number of columns in each waveform frame layout
-    frameNumColumns.append(1);
-    frameNumColumns.append(1);
-    frameNumColumns.append(1);
-    frameNumColumns.append(2);
-    frameNumColumns.append(4);
-    frameNumColumns.append(4);
+    createAllFrames();
 
     // Set default number of frames per screen for each port.
     numFramesIndex.resize(6);
-    for (port = 0; port < numFramesIndex.size(); ++port) {
+    for (int port = 0; port < numFramesIndex.size(); ++port) {
         numFramesIndex[port] = frameList.size() - 1;
         if (signalSources->signalPort[port].enabled) {
             while (frameList[numFramesIndex[port]].size() >
@@ -158,6 +98,29 @@ void WavePlot::initialize(int startingPort)
     }
 
     setNumFrames(numFramesIndex[selectedPort]);
+}
+
+void WavePlot::createFrames(unsigned int frameIndex, unsigned int maxX, unsigned int maxY) {
+    QVector<QRect>& frames = frameList[frameIndex];
+    frameNumColumns[frameIndex] = maxX;
+
+    unsigned int xSize = (width() - 10 - 6 * (maxX - 1)) / maxX;
+    unsigned int xOffset = xSize + 6;
+
+    const int textBoxHeight = fontMetrics().height();
+
+    unsigned int ySpacing = 2 * textBoxHeight + ((maxY == 8) ? 1 : 3);
+    unsigned int yOffset = (height() - 4) / maxY;
+    unsigned int ySize = yOffset - ySpacing;
+
+    frames.resize(maxY * maxX);
+    unsigned int index = 0;
+    for (unsigned int y = 0; y < maxY; ++y) {
+        for (unsigned int x = 0; x < maxX; x++) {
+            frames[index] = QRect(5 + xOffset * x, 2 + textBoxHeight + yOffset * y, xSize, ySize);
+            ++index;
+        }
+    }
 }
 
 // Allocates memory for a 3-D array of doubles.
@@ -662,16 +625,21 @@ void WavePlot::highlightFrame(int frameIndex, bool eraseOldFrame)
 // Refresh pixel map used in double buffered graphics.
 void WavePlot::refreshPixmap()
 {
+    // Pixel map used for double buffering.
+    pixmap = QPixmap(size());
+    pixmap.fill();
+
     QPainter painter(&pixmap);
     painter.initFrom(this);
 
     // Clear old display.
-    painter.eraseRect(0, 0, 859, 689);
+    painter.eraseRect(rect());
 
     // Draw box around entire display.
-    QRect rect(0, 0, 859, 689);
     painter.setPen(Qt::darkGray);
-    painter.drawRect(rect);
+    QRect r(rect());
+    r.adjust(0, 0, -1, -1);
+    painter.drawRect(r);
 
     // Plot all frames.
     for (int i = 0; i < frameList[numFramesIndex[selectedPort]].size(); i++) {
@@ -680,6 +648,25 @@ void WavePlot::refreshPixmap()
 
     tPosition = 0;
     update();
+}
+
+void WavePlot::createAllFrames() {
+    // Create lists of frame (plot window) dimensions for different numbers
+    // of frames per screen.
+    frameList.resize(6);
+    frameNumColumns.resize(6);
+    createFrames(0, 1, 1);
+    createFrames(1, 1, 2);
+    createFrames(2, 1, 4);
+    createFrames(3, 2, 4);
+    createFrames(4, 4, 4);
+    createFrames(5, 4, 8);
+}
+
+void WavePlot::resizeEvent(QResizeEvent*) {
+    createAllFrames();
+
+    refreshPixmap();
 }
 
 // Plot a particular frame.
@@ -739,7 +726,7 @@ void WavePlot::drawAxisLines(QPainter &painter, int frameNumber)
 void WavePlot::drawAxisText(QPainter &painter, int frameNumber)
 {
     const int textBoxWidth = 180;
-    const int textBoxHeight = 20;
+    const int textBoxHeight = painter.fontMetrics().height();
 
     QRect frame = frameList[numFramesIndex[selectedPort]][frameNumber];
 

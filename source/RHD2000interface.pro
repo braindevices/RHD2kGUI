@@ -1,8 +1,13 @@
 TEMPLATE      = app
 
-QT            += widgets
+QT            += widgets multimedia
 
 CONFIG        += static
+
+macx:{
+QMAKE_RPATHDIR += /users/intan/qt/5.7/clang_64/lib
+QMAKE_RPATHDIR += /users/intan/downloads/
+}
 
 HEADERS       = \
     okFrontPanelDLL.h \
@@ -30,7 +35,6 @@ HEADERS       = \
     helpdialogdacs.h \
     helpdialogcomparators.h \
     helpdialogchipfilters.h \
-    qtincludes.h \
     auxdigoutconfigdialog.h \
     cabledelaydialog.h \
     helpdialogfastsettle.h
@@ -65,5 +69,9 @@ SOURCES       = main.cpp \
     helpdialogfastsettle.cpp
     
 RESOURCES     = RHD2000interface.qrc
-LIBS+=-lm
-LIBS+=-ldl
+
+macx:{
+LIBS += -L$$PWD/../../../Downloads/ -lokFrontPanel
+INCLUDEPATH += $$PWD/../../../Downloads
+DEPENDPATH += $$PWD/../../../Downloads
+}

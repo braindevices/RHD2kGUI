@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.3
-//  Copyright (C) 2013 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -20,8 +20,10 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtGui>
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+#include <QtWidgets>
+#endif
 
-#include "qtincludes.h"
 #include "triggerrecorddialog.h"
 
 // Triggered recording dialog.
@@ -29,11 +31,11 @@
 // recording session.
 
 TriggerRecordDialog::TriggerRecordDialog(int initialTriggerChannel, int initialTriggerPolarity,
-                                         int initialTriggerBuffer, QWidget *parent) :
+                                         int initialTriggerBuffer, int initialPostTrigger,
+                                         bool initialSaveTriggerChannel, QWidget *parent) :
     QDialog(parent)
 {
-    setWindowTitle(tr("Triggered Recording Control"));
-    setFixedWidth(340);
+    setWindowTitle(tr("Episodic Triggered Recording Control"));
 
     QLabel *label1 = new QLabel(tr("Digital or analog inputs lines may be used to trigger "
                                    "recording.  If an analog input line is selected, the "
@@ -78,9 +80,13 @@ TriggerRecordDialog::TriggerRecordDialog(int initialTriggerChannel, int initialT
     connect(triggerPolarityComboBox, SIGNAL(currentIndexChanged(int)),
             this, SLOT(setTriggerPolarity(int)));
 
+    saveTriggerChannelCheckBox = new QCheckBox(tr("Automatically Save Trigger Channel"));
+    saveTriggerChannelCheckBox->setChecked(initialSaveTriggerChannel);
+
     QVBoxLayout *triggerControls = new QVBoxLayout;
     triggerControls->addWidget(digitalInputComboBox);
     triggerControls->addWidget(triggerPolarityComboBox);
+    triggerControls->addWidget(saveTriggerChannelCheckBox);
 
     QHBoxLayout *triggerHBox = new QHBoxLayout;
     triggerHBox->addLayout(triggerControls);
@@ -126,6 +132,35 @@ TriggerRecordDialog::TriggerRecordDialog(int initialTriggerChannel, int initialT
     bufferHLayout->addWidget(bufferGroupBox);
 //    bufferHLayout->addStretch(1);
 
+    postTriggerSpinBox = new QSpinBox();
+    postTriggerSpinBox->setRange(1, 9999);
+    postTriggerSpinBox->setValue(initialPostTrigger);
+
+    connect(postTriggerSpinBox, SIGNAL(valueChanged(int)),
+            this, SLOT(postTriggerSeconds(int)));
+
+    QHBoxLayout *postTriggerSpinBoxLayout = new QHBoxLayout;
+    postTriggerSpinBoxLayout->addWidget(postTriggerSpinBox);
+    postTriggerSpinBoxLayout->addWidget(new QLabel(tr("seconds")));
+    postTriggerSpinBoxLayout->addStretch(1);
+
+    QLabel *label4 = new QLabel(tr("If a posttrigger time of M seconds is selected, "
+                                   "slightly more than M seconds of data will be "
+                                   "saved to disk after the trigger is de-asserted."));
+    label4->setWordWrap(true);
+
+    QVBoxLayout *postTriggerSelectLayout = new QVBoxLayout;
+    postTriggerSelectLayout->addWidget(new QLabel(tr("Posttrigger data saved (range: 1-9999 seconds):")));
+    postTriggerSelectLayout->addLayout(postTriggerSpinBoxLayout);
+    postTriggerSelectLayout->addWidget(label4);
+
+    QGroupBox *postTriggerGroupBox = new QGroupBox(tr("Posttrigger Buffer"));
+    postTriggerGroupBox->setLayout(postTriggerSelectLayout);
+
+    QHBoxLayout *postTriggerHLayout = new QHBoxLayout;
+    postTriggerHLayout->addWidget(postTriggerGroupBox);
+//    postTriggerHLayout->addStretch(1);
+
     buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 
     connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
@@ -134,13 +169,16 @@ TriggerRecordDialog::TriggerRecordDialog(int initialTriggerChannel, int initialT
     QLabel *label3 = new QLabel(tr("Press OK to start triggered recording with selected settings.  "
                                    "Waveforms will be displayed in real time, but recording will "
                                    "not start until the trigger is detected.  A tone will indicate "
-                                   "when the trigger has been detected.  Press the Stop button to "
-                                   "cancel triggered recording."));
+                                   "when the trigger has been detected.  A different tone indicates "
+                                   "that recording has stopped after a trigger has been de-asserted.  "
+                                   "Successive trigger events will create new saved data files.  "
+                                   "Press the Stop button to exit triggered recording mode."));
     label3->setWordWrap(true);
 
     QVBoxLayout *mainLayout = new QVBoxLayout;
     mainLayout->addLayout(triggerHLayout);
     mainLayout->addLayout(bufferHLayout);
+    mainLayout->addLayout(postTriggerHLayout);
     mainLayout->addWidget(label3);
     mainLayout->addWidget(buttonBox);
 
@@ -149,6 +187,7 @@ TriggerRecordDialog::TriggerRecordDialog(int initialTriggerChannel, int initialT
     setDigitalInput(digitalInputComboBox->currentIndex());
     setTriggerPolarity(triggerPolarityComboBox->currentIndex());
     recordBufferSeconds(recordBufferSpinBox->value());
+    postTriggerSeconds(postTriggerSpinBox->value());
 
 }
 
@@ -165,5 +204,11 @@ void TriggerRecordDialog::setTriggerPolarity(int index)
 void TriggerRecordDialog::recordBufferSeconds(int value)
 {
     recordBuffer = value;
+    buttonBox->setFocus();
+}
+
+void TriggerRecordDialog::postTriggerSeconds(int value)
+{
+    postTriggerTime = value;
     buttonBox->setFocus();
 }

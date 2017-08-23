@@ -1,8 +1,8 @@
 //  ------------------------------------------------------------------------
 //
 //  This file is part of the Intan Technologies RHD2000 Interface
-//  Version 1.41
-//  Copyright (C) 2013-2014 Intan Technologies
+//  Version 1.5.2
+//  Copyright (C) 2013-2017 Intan Technologies
 //
 //  ------------------------------------------------------------------------
 //
@@ -20,7 +20,12 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <QtGui>
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+#include <QtWidgets>
+#endif
 #include <QWidget>
+#include <qglobal.h>
+
 #include <QFile>
 #include <QTime>
 #include <QSound>
@@ -28,8 +33,6 @@
 #include <fstream>
 #include <vector>
 #include <queue>
-
-#include "qtincludes.h"
 
 #include "mainwindow.h"
 #include "globalconstants.h"
@@ -82,6 +85,11 @@ MainWindow::MainWindow()
     dacSelectedChannel.resize(8);
     dacSelectedChannel.fill(0);
 
+    cableLengthPortA = 1.0;
+    cableLengthPortB = 1.0;
+    cableLengthPortC = 1.0;
+    cableLengthPortD = 1.0;
+
     chipId.resize(MAX_NUM_DATA_STREAMS);
     chipId.fill(-1);
 
@@ -103,6 +111,8 @@ MainWindow::MainWindow()
     recordTriggerChannel = 0;
     recordTriggerPolarity = 0;
     recordTriggerBuffer = 1;
+    postTriggerTime = 1;
+    saveTriggerChannel = true;
 
     signalSources = new SignalSources();
 
@@ -124,6 +134,7 @@ MainWindow::MainWindow()
     running = false;
     recording = false;
     triggerSet = false;
+    triggered = false;
 
     saveTemp = false;
     saveTtlOut = false;
@@ -203,6 +214,19 @@ MainWindow::MainWindow()
         }
         fileTemp.close();
     }
+
+    QFile fileTemp2(QDir::tempPath() + "/triggerendbeep.wav");
+    if (fileTemp2.open(QIODevice::ReadWrite))
+    {
+        QFile resourceFile2(":/sounds/triggerendbeep.wav");
+        if(resourceFile2.open(QIODevice::ReadOnly))
+        {
+            fileTemp2.write(resourceFile2.readAll());
+            resourceFile2.close();
+        }
+        fileTemp2.close();
+    }
+    adjustSize();
 }
 
 // Scan SPI Ports A-D to identify all connected RHD2000 amplifier chips.
@@ -278,7 +302,6 @@ void MainWindow::createLayout()
     int i;
 
     setWindowIcon(QIcon(":/images/Intan_Icon_32p_trans24.png"));
-    setFixedSize(1245, 750);
 
     runButton = new QPushButton(tr("&Run"));
     stopButton = new QPushButton(tr("&Stop"));
@@ -294,30 +317,22 @@ void MainWindow::createLayout()
     disableAllButton = new QPushButton(tr("Disable All on Port"));
     spikeScopeButton = new QPushButton(tr("Open Spike Scope"));
 
-    const int helpButtonWidth = 20;
-
     helpDialogChipFiltersButton = new QPushButton(tr("?"));
-    helpDialogChipFiltersButton->setFixedWidth(helpButtonWidth);
     connect(helpDialogChipFiltersButton, SIGNAL(clicked()), this, SLOT(chipFiltersHelp()));
 
     helpDialogComparatorsButton = new QPushButton(tr("?"));
-    helpDialogComparatorsButton->setFixedWidth(helpButtonWidth);
     connect(helpDialogComparatorsButton, SIGNAL(clicked()), this, SLOT(comparatorsHelp()));
 
     helpDialogDacsButton = new QPushButton(tr("?"));
-    helpDialogDacsButton->setFixedWidth(helpButtonWidth);
     connect(helpDialogDacsButton, SIGNAL(clicked()), this, SLOT(dacsHelp()));
 
     helpDialogHighpassFilterButton = new QPushButton(tr("?"));
-    helpDialogHighpassFilterButton->setFixedWidth(helpButtonWidth);
     connect(helpDialogHighpassFilterButton, SIGNAL(clicked()), this, SLOT(highpassFilterHelp()));
 
     helpDialogNotchFilterButton = new QPushButton(tr("?"));
-    helpDialogNotchFilterButton->setFixedWidth(helpButtonWidth);
     connect(helpDialogNotchFilterButton, SIGNAL(clicked()), this, SLOT(notchFilterHelp()));
 
     helpDialogSettleButton = new QPushButton(tr("?"));
-    helpDialogSettleButton->setFixedWidth(helpButtonWidth);
     connect(helpDialogSettleButton, SIGNAL(clicked()), this, SLOT(fastSettleHelp()));
 
     displayPortAButton = new QRadioButton(signalSources->signalPort[0].name);
@@ -476,11 +491,6 @@ void MainWindow::createLayout()
 
     fifoFullLabel = new QLabel(tr("(0% full)"));
     fifoFullLabel->setStyleSheet("color: black");
-
-    runButton->setFixedWidth(70);
-    stopButton->setFixedWidth(70);
-    recordButton->setFixedWidth(70);
-    triggerButton->setFixedWidth(70);
 
     QHBoxLayout *runStopLayout = new QHBoxLayout;
     runStopLayout->addWidget(runButton);
@@ -777,7 +787,6 @@ void MainWindow::createLayout()
     QVBoxLayout *configLayout =  new QVBoxLayout;
     scanButton = new QPushButton(tr("Rescan Ports A-D"));
     setCableDelayButton = new QPushButton(tr("Manual"));
-    setCableDelayButton->setFixedWidth(50);
     digOutButton = new QPushButton(tr("Configure Realtime Control"));
     fastSettleCheckBox = new QCheckBox(tr("Manual"));
     externalFastSettleCheckBox = new QCheckBox(tr("Realtime Settle Control:"));
@@ -941,11 +950,35 @@ void MainWindow::createLayout()
     QHBoxLayout *mainLayout = new QHBoxLayout;
     mainLayout->addLayout(leftLayout);
     mainLayout->addWidget(wavePlot);
+    mainLayout->setStretch(0, 0);
+    mainLayout->setStretch(1, 1);
 
     QWidget *mainWidget = new QWidget;
     mainWidget->setLayout(mainLayout);
 
+    QRect screenRect = QApplication::desktop()->screenGeometry();
     setCentralWidget(mainWidget);
+    adjustSize();
+
+    //If the screen height has less than 100 pixels to spare at the current size of mainWidget,
+    //or if the screen width has less than 100 pixels to spare, put mainWidget inside a QScrollArea
+
+    if ((screenRect.height() < mainWidget->height() + 100) ||
+            (screenRect.width() < mainWidget->width() + 100)) {
+        QScrollArea *scrollArea = new QScrollArea;
+        scrollArea->setWidget(mainWidget);
+        setCentralWidget(scrollArea);
+
+        if (screenRect.height() < mainWidget->height() + 100)
+            setMinimumHeight(screenRect.height() - 100);
+        else
+            setMinimumHeight(mainWidget->height() + 50);
+
+        if (screenRect.width() < mainWidget->width() + 100)
+            setMinimumWidth(screenRect.width() - 100);
+        else
+            setMinimumWidth(mainWidget->width() + 50);
+    }
 
     wavePlot->setFocus();
 }
@@ -1057,8 +1090,8 @@ void MainWindow::about()
 {
     QMessageBox::about(this, tr("About Intan Technologies RHD2000 Interface"),
             tr("<h2>Intan Technologies RHD2000 Interface</h2>"
-               "<p>Version 1.41"
-               "<p>Copyright &copy; 2013-2014 Intan Technologies"
+               "<p>Version 1.5.2"
+               "<p>Copyright &copy; 2013-2017 Intan Technologies"
                "<p>This biopotential recording application controls the RHD2000 "
                "USB Interface Board from Intan Technologies.  The C++/Qt source code "
                "for this application is freely available from Intan Technologies. "
@@ -1531,7 +1564,7 @@ void MainWindow::changeSampleRate(int sampleRateIndex)
     case 4:
         sampleRate = Rhd2000EvalBoard::SampleRate2500Hz;
         boardSampleRate = 2500.0;
-        numUsbBlocksToRead = 1;
+        numUsbBlocksToRead = 2;
         break;
     case 5:
         sampleRate = Rhd2000EvalBoard::SampleRate3000Hz;
@@ -1556,7 +1589,7 @@ void MainWindow::changeSampleRate(int sampleRateIndex)
     case 9:
         sampleRate = Rhd2000EvalBoard::SampleRate6250Hz;
         boardSampleRate = 6250.0;
-        numUsbBlocksToRead = 3;
+        numUsbBlocksToRead = 4;
         break;
     case 10:
         sampleRate = Rhd2000EvalBoard::SampleRate8000Hz;
@@ -1745,12 +1778,14 @@ void MainWindow::openInterfaceBoard()
     // Open Opal Kelly XEM6010 board.
     int errorCode = evalBoard->open();
 
+    // cerr << "In MainWindow::openInterfaceBoard.  errorCode = " << errorCode << "\n";
+
     if (errorCode < 1) {
         QMessageBox::StandardButton r;
         if (errorCode == -1) {
             r = QMessageBox::question(this, tr("Cannot load Opal Kelly FrontPanel DLL"),
                                   tr("Opal Kelly USB drivers not installed.  "
-                                     "Click OK to run application with sythesized biopotential data for "
+                                     "Click OK to run application with synthesized biopotential data for "
                                      "demonstration purposes."
                                      "<p>To use the RHD2000 Interface, click Cancel, load the correct "
                                      "Opal Kelly drivers, then restart the application."
@@ -1759,7 +1794,7 @@ void MainWindow::openInterfaceBoard()
         } else {
             r = QMessageBox::question(this, tr("Intan RHD2000 USB Interface Board Not Found"),
                                   tr("Intan Technologies RHD2000 Interface not found on any USB port.  "
-                                     "Click OK to run application with sythesized biopotential data for "
+                                     "Click OK to run application with synthesized biopotential data for "
                                      "demonstration purposes."
                                      "<p>To use the RHD2000 Interface, click Cancel, connect the device "
                                      "to a USB port, then restart the application."
@@ -2344,7 +2379,7 @@ int MainWindow::deviceId(Rhd2000DataBlock *dataBlock, int stream, int &register5
 void MainWindow::recordInterfaceBoard()
 {
     // Create list of enabled channels that will be saved to disk.
-    signalProcessor->createSaveList(signalSources);
+    signalProcessor->createSaveList(signalSources, false, 0);
 
     startNewSaveFile(saveFormat);
 
@@ -2361,6 +2396,7 @@ void MainWindow::recordInterfaceBoard()
 
     recording = true;
     triggerSet = false;
+    triggered = false;
     runInterfaceBoard();
 }
 
@@ -2368,15 +2404,18 @@ void MainWindow::recordInterfaceBoard()
 void MainWindow::triggerRecordInterfaceBoard()
 {
     TriggerRecordDialog triggerRecordDialog(recordTriggerChannel, recordTriggerPolarity,
-                                            recordTriggerBuffer, this);
+                                            recordTriggerBuffer, postTriggerTime,
+                                            saveTriggerChannel, this);
 
     if (triggerRecordDialog.exec()) {
         recordTriggerChannel = triggerRecordDialog.digitalInput;
         recordTriggerPolarity = triggerRecordDialog.triggerPolarity;
         recordTriggerBuffer = triggerRecordDialog.recordBuffer;
+        postTriggerTime = triggerRecordDialog.postTriggerTime;
+        saveTriggerChannel = (triggerRecordDialog.saveTriggerChannelCheckBox->checkState() == Qt::Checked);
 
         // Create list of enabled channels that will be saved to disk.
-        signalProcessor->createSaveList(signalSources);
+        signalProcessor->createSaveList(signalSources, saveTriggerChannel, recordTriggerChannel);
 
         // Disable some GUI buttons while recording is in progress.
         enableChannelButton->setEnabled(false);
@@ -2388,6 +2427,7 @@ void MainWindow::triggerRecordInterfaceBoard()
 
         recording = false;
         triggerSet = true;
+        triggered = false;
         runInterfaceBoard();
     }
 
@@ -2488,6 +2528,11 @@ void MainWindow::runInterfaceBoard()
     int timestampOffset = 0;
     unsigned int preTriggerBufferQueueLength = 0;
     queue<Rhd2000DataBlock> bufferQueue;
+    static int fifoNearlyFull = 0;
+    static int triggerEndCounter = 0;
+    int triggerEndThreshold;
+
+    triggerEndThreshold = qCeil(postTriggerTime * boardSampleRate / (numUsbBlocksToRead * SAMPLES_PER_DATA_BLOCK)) - 1;
 
     if (triggerSet) {
         preTriggerBufferQueueLength = numUsbBlocksToRead *
@@ -2496,6 +2541,7 @@ void MainWindow::runInterfaceBoard()
     }
 
     QSound triggerBeep(QDir::tempPath() + "/triggerbeep.wav");
+    QSound triggerEndBeep(QDir::tempPath() + "/triggerendbeep.wav");
 
     // Average temperature sensor readings over a ~0.1 second interval.
     signalProcessor->tempHistoryReset(numUsbBlocksToRead * 3);
@@ -2620,8 +2666,9 @@ void MainWindow::runInterfaceBoard()
                 // Read waveform data from USB interface board.
                 totalBytesWritten +=
                         signalProcessor->loadAmplifierData(dataQueue, (int) numUsbBlocksToRead,
-                                                           triggerSet, recordTriggerChannel,
-                                                           recordTriggerPolarity, triggerIndex, bufferQueue,
+                                                           (triggerSet | triggered), recordTriggerChannel,
+                                                           (triggered ? (1 - recordTriggerPolarity) : recordTriggerPolarity),
+                                                           triggerIndex, triggerSet, bufferQueue,
                                                            recording, *saveStream, saveFormat, saveTemp,
                                                            saveTtlOut, timestampOffset);
 
@@ -2631,6 +2678,7 @@ void MainWindow::runInterfaceBoard()
 
                 if (triggerSet && (triggerIndex != -1)) {
                     triggerSet = false;
+                    triggered = true;
                     recording = true;
                     timestampOffset = triggerIndex;
 
@@ -2649,6 +2697,25 @@ void MainWindow::runInterfaceBoard()
                     // Write contents of pre-trigger buffer to file.
                     totalBytesWritten += signalProcessor->saveBufferedData(bufferQueue, *saveStream, saveFormat,
                                                                            saveTemp, saveTtlOut, timestampOffset);
+                } else if (triggered && (triggerIndex != -1)) { // New in version 1.5: episodic triggered recording
+                    triggerEndCounter++;
+                    if (triggerEndCounter > triggerEndThreshold) {
+                                                    // Keep recording for the specified number of seconds after the trigger has
+                                                    // been de-asserted.
+                        triggerEndCounter = 0;
+                        triggerSet = true;          // Enable trigger again for true episodic recording.
+                        triggered = false;
+                        recording = false;
+                        closeSaveFile(saveFormat);
+                        totalRecordTimeSeconds = 0.0;
+
+                        setStatusBarWaitForTrigger();
+
+                        // Play trigger end sound
+                        triggerEndBeep.play();
+                    }
+                } else if (triggered) {
+                    triggerEndCounter = 0;          // Ignore brief (< 1 second) trigger-off events.
                 }
             }
 
@@ -2684,37 +2751,44 @@ void MainWindow::runInterfaceBoard()
                 }
             }
 
-            // If the USB interface FIFO (on the FPGA board) exceeds 99% full, halt
+            // If the USB interface FIFO (on the FPGA board) exceeds 98% full, halt
             // data acquisition and display a warning message.
-            if (fifoPercentageFull > 99.0) {
-                running = false;
+            if (fifoPercentageFull > 98.0) {
+                fifoNearlyFull++;   // We must see the FIFO >98% full three times in a row to eliminate the possiblity
+                                    // of a USB glitch causing recording to stop.  (Added for version 1.5.)
+                if (fifoNearlyFull > 2) {
+                    running = false;
 
-                // Stop data acquisition
-                if (!synthMode) {
-                    evalBoard->setContinuousRunMode(false);
-                    evalBoard->setMaxTimeStep(0);
+                    // Stop data acquisition
+                    if (!synthMode) {
+                        evalBoard->setContinuousRunMode(false);
+                        evalBoard->setMaxTimeStep(0);
+                    }
+
+                    if (recording) {
+                        closeSaveFile(saveFormat);
+                        recording = false;
+                        triggerSet = false;
+                        triggered = false;
+                    }
+
+                    // Turn off LED.
+                    for (int i = 0; i < 8; ++i) ledArray[i] = 0;
+                    ttlOut[15] = 0;
+                    if (!synthMode) {
+                        evalBoard->setLedDisplay(ledArray);
+                        evalBoard->setTtlOut(ttlOut);
+                    }
+
+                    QMessageBox::critical(this, tr("USB Buffer Overrun Error"),
+                                          tr("Recording was stopped because the USB FIFO buffer on the interface "
+                                             "board reached maximum capacity.  This happens when the host computer "
+                                             "cannot keep up with the data streaming from the interface board."
+                                             "<p>Try lowering the sample rate, disabling the notch filter, or reducing "
+                                             "the number of waveforms on the screen to reduce CPU load."));
                 }
-
-                if (recording) {
-                    closeSaveFile(saveFormat);
-                    recording = false;
-                    triggerSet = false;
-                }
-
-                // Turn off LED.
-                for (int i = 0; i < 8; ++i) ledArray[i] = 0;
-                ttlOut[15] = 0;
-                if (!synthMode) {
-                    evalBoard->setLedDisplay(ledArray);
-                    evalBoard->setTtlOut(ttlOut);
-                }
-
-                QMessageBox::critical(this, tr("USB Buffer Overrun Error"),
-                                      tr("Recording was stopped because the USB FIFO buffer on the interface "
-                                         "board reached maximum capacity.  This happens when the host computer "
-                                         "cannot keep up with the data streaming from the interface board."
-                                         "<p>Try lowering the sample rate, disabling the notch filter, or reducing "
-                                         "the number of waveforms on the screen to reduce CPU load."));
+            } else {
+                fifoNearlyFull = 0;
             }
 
             // Advance LED display
@@ -2770,6 +2844,7 @@ void MainWindow::runInterfaceBoard()
 
     // Reset trigger
     triggerSet = false;
+    triggered = false;
 
     totalRecordTimeSeconds = 0.0;
 
@@ -2854,7 +2929,7 @@ void MainWindow::selectBaseFilename(SaveFormat format)
     wavePlot->setFocus();
 }
 
-// Open Intan Technologis website in the default browser.
+// Open Intan Technologies website in the default browser.
 void MainWindow::openIntanWebsite()
 {
     QDesktopServices::openUrl(QUrl("http://www.intantech.com", QUrl::TolerantMode));
@@ -3224,6 +3299,14 @@ void MainWindow::loadSettings()
         }
     }
 
+    // Version 1.5 additions
+    if ((versionMain == 1 && versionSecondary >= 5) || (versionMain > 1)) {
+        inStream >> tempQint16;
+        postTriggerTime = tempQint16;
+        inStream >> tempQint16;
+        saveTriggerChannel = (bool) tempQint16;
+    }
+
     settingsFile.close();
 
     wavePlot->refreshScreen();
@@ -3349,6 +3432,10 @@ void MainWindow::saveSettings()
     outStream << (qint16) manualDelay[1];
     outStream << (qint16) manualDelay[2];
     outStream << (qint16) manualDelay[3];
+
+    // version 1.5 additions
+    outStream << (qint16) postTriggerTime;
+    outStream << (qint16) saveTriggerChannel;
 
     settingsFile.close();
 
@@ -3517,7 +3604,7 @@ void MainWindow::runImpedanceMeasurement()
                 qApp->processEvents();
             }
             evalBoard->readDataBlocks(numBlocks, dataQueue);
-            signalProcessor->loadAmplifierData(dataQueue, numBlocks, false, 0, 0, triggerIndex, bufferQueue,
+            signalProcessor->loadAmplifierData(dataQueue, numBlocks, false, 0, 0, triggerIndex, false, bufferQueue,
                                                false, *saveStream, saveFormat, false, false, 0);
             for (stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
                 if (chipId[stream] != CHIP_ID_RHD2164_B) {
@@ -3541,7 +3628,7 @@ void MainWindow::runImpedanceMeasurement()
                     qApp->processEvents();
                 }
                 evalBoard->readDataBlocks(numBlocks, dataQueue);
-                signalProcessor->loadAmplifierData(dataQueue, numBlocks, false, 0, 0, triggerIndex, bufferQueue,
+                signalProcessor->loadAmplifierData(dataQueue, numBlocks, false, 0, 0, triggerIndex, false, bufferQueue,
                                                    false, *saveStream, saveFormat, false, false, 0);
                 for (stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
                     if (chipId[stream] == CHIP_ID_RHD2164_B) {
@@ -3568,8 +3655,7 @@ void MainWindow::runImpedanceMeasurement()
     const double bestAmplitude = 250.0;  // we favor voltage readings that are closest to 250 uV: not too large,
                                          // and not too small.
     const double dacVoltageAmplitude = 128 * (1.225 / 256);  // this assumes the DAC amplitude was set to 128
-    const double parasiticCapacitance = 14.0e-12;  // 14 pF: an estimate of on-chip parasitic capacitance,
-                                                   // including 10 pF of amplifier input capacitance.
+    const double parasiticCapacitance = 10.0e-12;  // 10 pF: an estimate of on-chip parasitic capacitance.
     double relativeFreq = actualImpedanceFreq / boardSampleRate;
 
     int bestAmplitudeIndex;
@@ -3740,30 +3826,32 @@ void MainWindow::saveImpedances()
         for (int stream = 0; stream < evalBoard->getNumEnabledDataStreams(); ++stream) {
             for (int channel = 0; channel < 32; ++channel) {
                 signalChannel = signalSources->findAmplifierChannel(stream, channel);
-                equivalentR = signalChannel->electrodeImpedanceMagnitude *
+                if (signalChannel != nullptr) {
+                    equivalentR = signalChannel->electrodeImpedanceMagnitude *
                         qCos(DEGREES_TO_RADIANS * signalChannel->electrodeImpedancePhase);
-                equivalentC = 1.0 / (TWO_PI * actualImpedanceFreq * signalChannel->electrodeImpedanceMagnitude *
-                                     -1.0 * qSin(DEGREES_TO_RADIANS * signalChannel->electrodeImpedancePhase));
+                    equivalentC = 1.0 / (TWO_PI * actualImpedanceFreq * signalChannel->electrodeImpedanceMagnitude *
+                        -1.0 * qSin(DEGREES_TO_RADIANS * signalChannel->electrodeImpedancePhase));
 
-                out.setRealNumberNotation(QTextStream::ScientificNotation);
-                out.setRealNumberPrecision(2);
+                    out.setRealNumberNotation(QTextStream::ScientificNotation);
+                    out.setRealNumberPrecision(2);
 
-                out << signalChannel->nativeChannelName << ",";
-                out << signalChannel->customChannelName << ",";
-                out << signalChannel->signalGroup->name << ",";
-                out << signalChannel->enabled << ",";
-                out << signalChannel->electrodeImpedanceMagnitude << ",";
+                    out << signalChannel->nativeChannelName << ",";
+                    out << signalChannel->customChannelName << ",";
+                    out << signalChannel->signalGroup->name << ",";
+                    out << signalChannel->enabled << ",";
+                    out << signalChannel->electrodeImpedanceMagnitude << ",";
 
-                out.setRealNumberNotation(QTextStream::FixedNotation);
-                out.setRealNumberPrecision(0);
+                    out.setRealNumberNotation(QTextStream::FixedNotation);
+                    out.setRealNumberPrecision(0);
 
-                out << signalChannel->electrodeImpedancePhase << ",";
+                    out << signalChannel->electrodeImpedancePhase << ",";
 
-                out.setRealNumberNotation(QTextStream::ScientificNotation);
-                out.setRealNumberPrecision(2);
+                    out.setRealNumberNotation(QTextStream::ScientificNotation);
+                    out.setRealNumberPrecision(2);
 
-                out << equivalentR << ",";
-                out << equivalentC << endl;
+                    out << equivalentR << ",";
+                    out << equivalentC << endl;
+                }
             }
         }
 
@@ -4010,49 +4098,49 @@ void MainWindow::setSaveFormatDialog()
 void MainWindow::setDacThreshold1(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(0, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(0, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold2(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(1, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(1, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold3(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(2, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(2, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold4(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(3, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(3, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold5(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(4, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(4, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold6(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(5, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(5, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold7(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(6, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(6, threshLevel, threshold >= 0);
 }
 
 void MainWindow::setDacThreshold8(int threshold)
 {
     int threshLevel = qRound((double) threshold / 0.195) + 32768;
-    evalBoard->setDacThreshold(7, threshLevel, threshold >= 0);
+    if (!synthMode) evalBoard->setDacThreshold(7, threshLevel, threshold >= 0);
 }
 
 int MainWindow::getEvalBoardMode()

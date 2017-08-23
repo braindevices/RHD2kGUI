@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 
 #include "okFrontPanelDLL.h"
 
@@ -289,9 +290,9 @@ void okCFrontPanel::SetTimeout(int timeout)
 	{ okFrontPanel_SetTimeout(h, timeout); }
 okCFrontPanel::ErrorCode okCFrontPanel::ResetFPGA()
 	{ return((okCFrontPanel::ErrorCode) okFrontPanel_ResetFPGA(h)); }
-okCFrontPanel::ErrorCode okCFrontPanel::ConfigureFPGAFromMemory(unsigned char *data, const unsigned long length, void(*callback)(int, int, void *), void *arg)
+okCFrontPanel::ErrorCode okCFrontPanel::ConfigureFPGAFromMemory(unsigned char *data, const unsigned long length, void(*)(int, int, void *), void *)
 	{ return((okCFrontPanel::ErrorCode) okFrontPanel_ConfigureFPGAFromMemory(h, data, length)); }
-okCFrontPanel::ErrorCode okCFrontPanel::ConfigureFPGA(const std::string strFilename, void (*callback)(int, int, void *), void *arg)
+okCFrontPanel::ErrorCode okCFrontPanel::ConfigureFPGA(const std::string strFilename, void (*)(int, int, void *), void *)
 	{ return((okCFrontPanel::ErrorCode) okFrontPanel_ConfigureFPGA(h, strFilename.c_str())); }
 okCFrontPanel::ErrorCode okCFrontPanel::GetFPGABootResetProfile(okTFPGAResetProfile *profile)
 	{ return((okCFrontPanel::ErrorCode) okFrontPanel_GetFPGABootResetProfile(h, profile)); }
@@ -1268,6 +1269,8 @@ okFrontPanel_GetDeviceCount(okFrontPanel_HANDLE hnd)
 {
 	if (_okFrontPanel_GetDeviceCount)
 		return((*_okFrontPanel_GetDeviceCount)(hnd));
+
+    std::cerr << "okFrontPanel_GetDeviceCount failing because _okFrontPanel_GetDeviceCount == null\n";
 
 	return(0);
 }

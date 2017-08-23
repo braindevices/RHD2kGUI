@@ -2,7 +2,7 @@ RHD2kGUI LW edition
 ========
 the RHD20002kGUI is the Interface software for intantech RHD2000 evaluation system.
 
-This edition enhanced the original RHD2kGUI program, by allowing Electrochemical Impedance Spectroscopy (EIS) on each individial electrode. It also allow user to save and load all settings, which can be very convienent when run several different experiments in parallel. 
+This edition enhanced the original RHD2kGUI program, by allowing Electrochemical Impedance Spectroscopy (EIS) on each individial electrode. It also automatically load settings from `~./rhd2kLWE/default.isf`, which can be very convienent when run several experiments with same configuration in parallel. 
 
 >Citation for this project: [Chapman, C.A.R., *Wang, L.*, Chen, H., Garrison, J., Lein, P.J., Seker, E. Advanced Functional Materials 27:1604631 (2017)](dx.doi.org/10.1002/adfm.201604631)
 
@@ -108,7 +108,7 @@ Now in this edition, we can simple use the font menu to change them: ![fontmenu]
 
 After I change left side font to 10 and right side font to 9, the text looks good: ![afterfontchange](doc/after_changefont.png)
 
-## Save and load your experiment settings
-In standard edition, the settings are automatically saved when closing the GUI and loaded when starting it. However, I often run experiments with different settings in parallel. I found it is very annoying to keep changing those settings manually. Thus I added this save/load function to quickly switch from one config to another.
-![configsaveload](doc/saveandloadsettings.png)
+## Automatic load your experiment settings
+It is common that one will run lots of experiments with the same settings. In standard edition, one have to keep loading the settings after reopenning the GUI. In this edition, the settings are automatically loaded from `~./rhd2kLWE/default.isf`. One can save a `default.isf` once he/she is happy about the current settings. After that, repeating experiments with same config does not require manually loading setting file any more.
 
+![configsaveload](doc/saveandloadsettings.png)

@@ -76,6 +76,8 @@ public:
     int getEvalBoardMode();
     bool isRecording();
 
+
+
 protected:
     void closeEvent(QCloseEvent *event);
 
@@ -127,11 +129,13 @@ private slots:
     void saveSettings();
     void showImpedances(bool enabled);
     void saveImpedances();
+    void runEISMeasurement();
     void runImpedanceMeasurement();
     void configDigOutControl();
     void manualCableDelayControl();
     void plotPointsMode(bool enabled);
     void setSaveFormatDialog();
+    void setDacThreshold(int dacChannel, int threshold);
     void setDacThreshold1(int threshold);
     void setDacThreshold2(int threshold);
     void setDacThreshold3(int threshold);
@@ -140,6 +144,18 @@ private slots:
     void setDacThreshold6(int threshold);
     void setDacThreshold7(int threshold);
     void setDacThreshold8(int threshold);
+
+    //add by Ling Wang for EIS test
+    void changeImpedanceFrequencyVec();
+    void isAutoSaveEIS(bool);
+    void isRunEIS(bool);
+    void saveLWESettings();
+    //end add by Ling Wang for EIS test
+
+    //add by Ling Wang to improve GUI
+    void changeLFonts();
+    void changeRFonts();
+    //end add by Ling Wang to improve GUI
 
 private:
     void createActions();
@@ -361,6 +377,45 @@ private:
     QLabel *actualImpedanceFreqLabel;
     QLabel *dacGainLabel;
     QLabel *dacNoiseSuppressLabel;
+
+    //add by Ling Wang for EIS test
+    QVector<double> desiredImpedanceFreqVec;
+    QVector<double> actualImpedanceFreqVec;
+    void clearEISdataInSingalsources();
+    void appendEISdataInSingalsources(double freq);
+    void saveImpedancesCSV(QString csvFileName);
+    void write1FreqEISfor1Chan(SignalChannel *signalChannel, QTextStream& out, int idx);
+    QString createEISfilename();
+    bool autoSaveEIS;
+    QCheckBox *autoSaveEISCheckBox;
+    bool autoRunEIS;
+    QCheckBox *autoRunEISCheckBox;
+
+    QAction *saveLWESettingsAction;
+
+
+
+    //end add by Ling Wang for EIS test
+
+    //add by Ling Wang to improve GUI
+    QWidget *leftside;
+
+    QMenu *fontsMenu;
+    QAction *changeLFontsAction;
+    QAction *changeRFontsAction;
+    QFont changeFonts(QWidget*);
+    QFont leftFont;
+    QFont rightFont;
+    void updateFonts(); //update widgets fonts with leftFont and rightFont
+
+    QString lastSettingFilePath = ".";
+
+    void loadDefaultSetting();
+    void _loadSettings(QString loadSettingsFileName);
+
+    //end add by Ling Wang to improve GUI
+
+
 };
 
 #endif // MAINWINDOW_H

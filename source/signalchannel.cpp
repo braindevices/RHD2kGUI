@@ -101,6 +101,9 @@ QDataStream& operator<<(QDataStream &outStream, const SignalChannel &a)
     outStream << (qint16) a.digitalEdgePolarity;
     outStream << a.electrodeImpedanceMagnitude;
     outStream << a.electrodeImpedancePhase;
+    outStream << a.EISFreqVec;
+    outStream << a.EIS_MagnitudeVec;
+    outStream << a.EIS_PhaseVec;
     return outStream;
 }
 
@@ -133,5 +136,8 @@ QDataStream& operator>>(QDataStream &inStream, SignalChannel &a)
     a.digitalEdgePolarity = (bool) tempQint16;
     inStream >> a.electrodeImpedanceMagnitude;
     inStream >> a.electrodeImpedancePhase;
+    inStream >> a.EISFreqVec;
+    inStream >> a.EIS_MagnitudeVec;
+    inStream >> a.EIS_PhaseVec;
     return inStream;
 }

@@ -40,5 +40,7 @@
 #include <QStatusBar>
 #include <QRadioButton>
 #include <QButtonGroup>
+#include <QSplitter>
+#include <QFontDialog>
 
 #endif // QTINCLUDES_H

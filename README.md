@@ -93,7 +93,7 @@ import matplotlib.pyplot as plt
 
 plot_eis(a, 'A-005')
 ```
-The result looks like this: ![eisplot](doc/eis_example_z_phase_freq.eps)
+The result looks like this: ![eisplot](doc/eis_example_z_phase_freq.png)
 
 
 ## Change the fonts

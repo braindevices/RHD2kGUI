@@ -2,7 +2,9 @@ RHD2kGUI LW edition
 ========
 the RHD20002kGUI is the Interface software for intantech RHD2000 evaluation system.
 
-This edition enhanced the original RHD2kGUI program, by allowing Electrochemical Impedance Spectroscopy (EIS) on each individial electrode. It also allow user to save and load all settings, which can be very convienent when run several different experiments in parallel.
+This edition enhanced the original RHD2kGUI program, by allowing Electrochemical Impedance Spectroscopy (EIS) on each individial electrode. It also allow user to save and load all settings, which can be very convienent when run several different experiments in parallel. 
+
+>Citation for this project: [Chapman, C.A.R., *Wang, L.*, Chen, H., Garrison, J., Lein, P.J., Seker, E. Advanced Functional Materials 27:1604631 (2017)](dx.doi.org/10.1002/adfm.201604631)
 
 ## EIS scanning
 ### Interface

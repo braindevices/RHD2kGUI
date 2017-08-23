@@ -14,8 +14,8 @@ One can still start the impedance scanning manually, with the `Run impedance mea
 
 ![eisdiag](doc/EISfeatures.png)
 
-### example EIS data
-The data are saved as csv
+### EIS data file
+The data are saved as `.csv`
 The EIS csv file is like this:
 ```
 Channel Number,Channel Name,Port,Enabled,Impedance Magnitude at  300.000000, 600.000000, 1000.000000, 2000.000000, 3750.000000, Hz (ohms),Impedance Phase (degrees),Series RC equivalent R (Ohms),Series RC equivalent C (Farads)

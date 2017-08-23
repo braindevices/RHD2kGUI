@@ -44,7 +44,7 @@ If the scanning frequencies are: 300, 600, 1k, 2k, and 3.75k, then the loaded da
 | A-002          | A-002        | Port A | 1       | 3.000000e+02 | 8.124212e+06     | -91.6           | -2.254001e+05                 | 5.226065e-12                    |
 
 ### load the csv data
-We can use the popular python package pandas to load the data:
+We can use the popular python package [pandas](http://pandas.pydata.org/) to load the data:
 
 ```
 import pandas as pd
@@ -70,7 +70,7 @@ Hz
 2000.0                     -118615.20                     4.913837e-11  
 3750.0                     -145454.90                     1.005024e-10  
 ```
-Now it can be plotted by `matplotlib`
+Now it can be plotted by [matplotlib](https://matplotlib.org/):
 
 ```
 import matplotlib.pyplot as plt
@@ -93,7 +93,9 @@ import matplotlib.pyplot as plt
 
 plot_eis(a, 'A-005')
 ```
-The result looks like this: ![eisplot](doc/eis_example_z_phase_freq.png)
+The result looks like this: 
+
+![eisplot](doc/eis_example_z_phase_freq.png)
 
 
 ## Change the fonts
